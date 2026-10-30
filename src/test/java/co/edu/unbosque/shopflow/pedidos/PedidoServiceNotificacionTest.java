@@ -12,8 +12,12 @@ import co.edu.unbosque.shopflow.notificaciones.BandejaNotificaciones;
 import co.edu.unbosque.shopflow.notificaciones.BandejaNotificaciones.NotificacionEnviada;
 import co.edu.unbosque.shopflow.notificaciones.NotificadorEmail;
 import co.edu.unbosque.shopflow.notificaciones.NotificadorSms;
+import co.edu.unbosque.shopflow.pagos.PasarelaDePago;
+import co.edu.unbosque.shopflow.pagos.PasarelasDePago;
+import co.edu.unbosque.shopflow.pagos.ResultadoPago;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PedidoServiceNotificacionTest {
@@ -39,9 +43,12 @@ class PedidoServiceNotificacionTest {
     }
 
     private final BandejaNotificaciones bandeja = new BandejaNotificaciones();
+    private final PasarelaDePago aprueba = (monto, ref) -> ResultadoPago.aprobado("QP-1");
+    private final PasarelaDePago rechaza = (monto, ref) -> ResultadoPago.rechazado("Fondos insuficientes");
     private final PedidoService servicio = new PedidoService(
             new CatalogoFijo(),
             new ServicioFacturacion(List.of(new FabricaColombia())),
+            new PasarelasDePago(Map.of("QUICKPAY", aprueba, "LEGACYPAY", rechaza)),
             List.of(new NotificadorEmail(bandeja), new NotificadorSms(bandeja)));
 
     private static PedidoRequest pedidoConCanal(String canal) {
@@ -65,22 +72,33 @@ class PedidoServiceNotificacionTest {
     }
 
     @Test
-    void trasElPagoSeNotificaPorElCanalDelPedidoConElTotalPagado() {
-        Pedido pagado = servicio.crear(pedidoConCanal("email")).pagado("LP4051");
+    void trasUnPagoAprobadoSeNotificaPorElCanalDelPedidoConElTotalPagado() {
+        Pedido creado = servicio.crear(pedidoConCanal("email"));
 
-        servicio.notificarPagoAprobado(pagado);
+        Pedido pagado = servicio.pagar(creado.id(), "QUICKPAY");
 
+        assertEquals(EstadoPedido.PAGADO, pagado.estado());
         assertEquals(1, bandeja.todas().size());
         NotificacionEnviada enviada = bandeja.todas().get(0);
         assertEquals("EMAIL", enviada.canal());
+        assertEquals("ana.perez@correo.com", enviada.destino());
         assertTrue(enviada.mensaje().contains(pagado.totalAPagar().toPlainString()));
     }
 
     @Test
-    void unPedidoSinCanalNoGeneraNotificacion() {
-        Pedido pagado = servicio.crear(pedidoConCanal(null)).pagado("LP4051");
+    void unPagoRechazadoNoGeneraNotificacion() {
+        Pedido creado = servicio.crear(pedidoConCanal("EMAIL"));
 
-        servicio.notificarPagoAprobado(pagado);
+        assertThrows(IllegalStateException.class, () -> servicio.pagar(creado.id(), "LEGACYPAY"));
+
+        assertTrue(bandeja.todas().isEmpty());
+    }
+
+    @Test
+    void unPedidoSinCanalNoGeneraNotificacion() {
+        Pedido creado = servicio.crear(pedidoConCanal(null));
+
+        servicio.pagar(creado.id(), "QUICKPAY");
 
         assertTrue(bandeja.todas().isEmpty());
     }
