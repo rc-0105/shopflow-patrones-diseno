@@ -1,0 +1,36 @@
+Escenario 8 (parte del Rol B): Consultar la auditoría de pagos
+Resultado esperado: Una entrada por cada cobro que llegó a una pasarela (3 entradas). Las notificaciones son del Rol C.
+
+
+1. Consulta de la auditoría
+Solicitud:
+curl -s localhost:8080/api/pagos/auditoria
+
+Respuesta JSON:
+
+[
+  {
+    "fecha": "2026-10-30T02:09:58.416627800Z",
+    "proveedor": "LEGACYPAY",
+    "referencia": "PED-1",
+    "montoUsd": 145.66,
+    "resultado": "APROBADO",
+    "duracionMs": 322
+  },
+  {
+    "fecha": "2026-10-30T02:10:01.262455100Z",
+    "proveedor": "LEGACYPAY",
+    "referencia": "PED-2",
+    "montoUsd": 3451.00,
+    "resultado": "RECHAZADO: Fondos insuficientes",
+    "duracionMs": 927
+  },
+  {
+    "fecha": "2026-10-30T02:10:01.381000700Z",
+    "proveedor": "QUICKPAY",
+    "referencia": "PED-2",
+    "montoUsd": 3451.00,
+    "resultado": "APROBADO",
+    "duracionMs": 4
+  }
+]

@@ -1,0 +1,5 @@
+# Reto B: salida en consola de MetricasPago durante los escenarios 6 y 7.
+
+Métricas LEGACYPAY: 1/1 aprobados (100.0 %)
+Métricas LEGACYPAY: 1/2 aprobados (50.0 %)
+Métricas QUICKPAY: 1/1 aprobados (100.0 %)
