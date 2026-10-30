@@ -87,7 +87,7 @@ classDiagram
         <<Director / Client>>
         +crear(PedidoRequest) Pedido
     }
-    Pedido +-- Builder : clase estática anidada
+    Pedido -- Builder : clase estática anidada
     Builder ..> Pedido : build()
     Pedido o-- ItemPedido
     PedidoService ..> Builder : traduce el JSON a llamadas
