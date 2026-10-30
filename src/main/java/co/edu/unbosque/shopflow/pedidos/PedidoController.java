@@ -26,6 +26,11 @@ public class PedidoController {
                 .body(PedidoResponse.de(pedido));
     }
 
+    @PostMapping("/{id}/pago")
+    public PedidoResponse pagar(@PathVariable String id, @RequestBody PagoRequest request) {
+        return PedidoResponse.de(servicio.pagar(id, request.proveedor()));
+    }
+
     @GetMapping("/{id}")
     public PedidoResponse buscar(@PathVariable String id) {
         return PedidoResponse.de(servicio.buscar(id));

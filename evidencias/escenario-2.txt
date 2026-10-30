@@ -1,0 +1,19 @@
+# Escenario 2: proxy de proteccion
+$ curl -i -X PUT localhost:8080/api/productos/SKU-003/precio -H "X-Rol: CLIENTE" -H "Content-Type: application/json" -d '{"precio": 299.90}'
+HTTP/1.1 403 
+Content-Type: application/json
+Transfer-Encoding: chunked
+
+{"error":"Solo el rol ADMIN puede cambiar precios"}
+
+
+$ curl -i -X PUT localhost:8080/api/productos/SKU-003/precio -H "X-Rol: ADMIN" -H "Content-Type: application/json" -d '{"precio": 299.90}'
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+
+{"sku":"SKU-003","nombre":"Monitor 27 pulgadas","precio":299.90}
+
+
+$ curl -s localhost:8080/api/productos/SKU-003
+{"sku":"SKU-003","nombre":"Monitor 27 pulgadas","precio":299.90}

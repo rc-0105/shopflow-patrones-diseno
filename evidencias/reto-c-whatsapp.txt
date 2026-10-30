@@ -1,0 +1,17 @@
+# Reto C: NotificadorWhatsApp (Factory Method). API recien iniciada.
+
+$ curl -s -w ' -> %{http_code}' -X POST localhost:8080/api/pedidos -H 'Content-Type: application/json' -d '{"clienteId":"CLI-001","documentoCliente":"1020304050","pais":"CO","contacto":"+573001234567","items":[{"sku":"SKU-002","cantidad":1}],"recogerEnTienda":true,"canalNotificacion":"WHATSAPP"}'
+{"id":"PED-1","estado":"CREADO","clienteId":"CLI-001","pais":"CO","contacto":"+573001234567","items":[{"sku":"SKU-002","nombre":"Mouse inalámbrico","cantidad":1,"precioUnitario":25.50}],"direccionEnvio":null,"recogerEnTienda":true,"envioExpress":false,"cupon":null,"notaRegalo":null,"canalNotificacion":"WHATSAPP","subtotal":25.50,"descuento":0.00,"comprobante":{"tipo":"Factura electrónica (DIAN)","numero":"FE-CO-1","base":25.50,"nombreImpuesto":"IVA 19%","impuesto":4.85,"total":30.35},"autorizacionPago":null} -> 201
+
+$ curl -s -w ' -> %{http_code}' -X POST localhost:8080/api/pedidos/PED-1/pago -H 'Content-Type: application/json' -d '{"proveedor":"QUICKPAY"}'
+{"id":"PED-1","estado":"PAGADO","clienteId":"CLI-001","pais":"CO","contacto":"+573001234567","items":[{"sku":"SKU-002","nombre":"Mouse inalámbrico","cantidad":1,"precioUnitario":25.50}],"direccionEnvio":null,"recogerEnTienda":true,"envioExpress":false,"cupon":null,"notaRegalo":null,"canalNotificacion":"WHATSAPP","subtotal":25.50,"descuento":0.00,"comprobante":{"tipo":"Factura electrónica (DIAN)","numero":"FE-CO-1","base":25.50,"nombreImpuesto":"IVA 19%","impuesto":4.85,"total":30.35},"autorizacionPago":"QP-0d4bca41"} -> 200
+
+$ curl -s -w ' -> %{http_code}' localhost:8080/api/notificaciones
+[{"canal":"WHATSAPP","destino":"+573001234567","mensaje":"✅ ShopFlow: el pago del pedido PED-1 fue aprobado. Total pagado: 30.35 USD.","fecha":"2026-10-30T00:30:34.4054737"}] -> 200
+
+$ curl -s -w ' -> %{http_code}' -X POST localhost:8080/api/pedidos -H 'Content-Type: application/json' -d '{"clienteId":"CLI-002","documentoCliente":"1020304050","pais":"CO","contacto":"3001234567","items":[{"sku":"SKU-002","cantidad":1}],"recogerEnTienda":true,"canalNotificacion":"WHATSAPP"}'
+{"error":"El canal WHATSAPP necesita un número con indicativo (ej. +573001234567), se recibió: 3001234567"} -> 400
+
+$ curl -s -w ' -> %{http_code}' -X POST localhost:8080/api/pedidos -H 'Content-Type: application/json' -d '{"clienteId":"CLI-003","documentoCliente":"1020304050","pais":"CO","contacto":"ana@correo.com","items":[{"sku":"SKU-002","cantidad":1}],"recogerEnTienda":true,"canalNotificacion":"PALOMA"}'
+{"error":"Canal de notificación no soportado: PALOMA. Canales disponibles: [WHATSAPP, SMS, EMAIL]"} -> 400
+

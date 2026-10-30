@@ -1,0 +1,27 @@
+# Reto C: WhatsApp (Factory Method). Evidencia de git diff --stat.
+# Regla del reto: "Nada: solo archivos nuevos."
+
+## Antes del reto (sobre 75f13eb, sin cambios pendientes)
+$ git diff --stat HEAD
+(sin salida: no hay archivos modificados)
+
+## Commit del reto
+$ git show --stat --format="%h %s" 97e8b1d
+97e8b1d feat(notificaciones): agregar NotificadorWhatsApp (reto C)
+
+ evidencias/reto-c-whatsapp.txt                     | 17 ++++++
+ .../notificaciones/NotificacionWhatsApp.java       | 32 +++++++++++
+ .../notificaciones/NotificadorWhatsApp.java        | 24 +++++++++
+ .../notificaciones/NotificadorWhatsAppTest.java    | 46 ++++++++++++++++
+ .../pedidos/PedidoServiceWhatsAppTest.java         | 63 ++++++++++++++++++++++
+ 5 files changed, 182 insertions(+)
+
+$ git show --name-status --format= 97e8b1d
+A	evidencias/reto-c-whatsapp.txt
+A	src/main/java/co/edu/unbosque/shopflow/notificaciones/NotificacionWhatsApp.java
+A	src/main/java/co/edu/unbosque/shopflow/notificaciones/NotificadorWhatsApp.java
+A	src/test/java/co/edu/unbosque/shopflow/notificaciones/NotificadorWhatsAppTest.java
+A	src/test/java/co/edu/unbosque/shopflow/pedidos/PedidoServiceWhatsAppTest.java
+
+# Resultado: 5 archivos, todos con estado A (agregado), 182 inserciones y 0 eliminaciones.
+# Ninguna clase existente se modificó.
