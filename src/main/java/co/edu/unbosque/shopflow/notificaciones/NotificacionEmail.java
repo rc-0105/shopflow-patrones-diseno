@@ -13,10 +13,15 @@ class NotificacionEmail implements Notificacion {
     }
 
     @Override
-    public void enviar(String destino, String mensaje) {
+    public void validarDestino(String destino) {
         if (destino == null || !destino.contains("@")) {
             throw new IllegalArgumentException("El canal EMAIL necesita un contacto con @, se recibió: " + destino);
         }
+    }
+
+    @Override
+    public void enviar(String destino, String mensaje) {
+        validarDestino(destino);
         bandeja.registrar(CANAL, destino, "[" + ASUNTO + "] " + mensaje);
     }
 }

@@ -413,6 +413,7 @@ classDiagram
 - `notificarPagoAprobado(...)` es `final`: el proceso no lo puede alterar ninguna subclase. Lo único que varía es el método fábrica `protected abstract Notificacion crearNotificacion()`.
 - Spring inyecta en `PedidoService` **todos** los `Notificador` anotados con `@Component` como `List<Notificador>`, y el servicio arma un mapa por `canal()`, igual que `ServicioFacturacion` con las fábricas de país.
 - Un canal no soportado responde 400 **al crear el pedido**, con la lista de canales disponibles. Es un `Optional.orElseThrow` sobre el mapa, no un `if` por canal. `Pedido.Builder` solo pasa el canal a mayúsculas: no lo valida contra una lista fija, así el reto de WhatsApp no toca `Pedido`.
+- El contacto se valida **al crear el pedido** con `Notificador.validarDestino(...)`, que delega en el mismo producto que luego se envía (`Notificacion.validarDestino`). Así un pedido EMAIL con un teléfono como contacto responde 400 antes de cobrar, y no después de un pago aprobado.
 - El canal es opcional (Anexo B.2): un pedido sin canal se crea igual y no se notifica.
 - Los productos concretos (`NotificacionEmail`, `NotificacionSms`) son *package-private*: fuera de `notificaciones` nadie puede nombrarlos.
 - Los notificadores reciben primitivas (`pedidoId`, `destino`, `totalPagado`) y no el `Pedido`, para que el paquete `notificaciones` no dependa de `pedidos`.

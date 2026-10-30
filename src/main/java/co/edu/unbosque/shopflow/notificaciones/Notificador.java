@@ -14,6 +14,11 @@ public abstract class Notificador {
     /** Método fábrica: cada canal entrega su propia notificación. */
     protected abstract Notificacion crearNotificacion();
 
+    /** Valida el destino con la misma notificación que se enviará, para rechazarlo antes de cobrar. */
+    public final void validarDestino(String destino) {
+        crearNotificacion().validarDestino(destino);
+    }
+
     public final void notificarPagoAprobado(String pedidoId, String destino, BigDecimal totalPagado) {
         String mensaje = "ShopFlow: el pago del pedido " + pedidoId + " fue aprobado. Total pagado: "
                 + totalPagado.toPlainString() + " USD.";

@@ -50,8 +50,10 @@ public class PedidoService {
             items.forEach(builder::item);
 
             Pedido pedido = builder.build();
-            // El canal es opcional; si llega, debe existir un notificador para él (400 si no).
-            Optional.ofNullable(pedido.canalNotificacion()).ifPresent(this::notificadorDe);
+            // El canal es opcional; si llega, debe existir su notificador y el contacto debe servirle (400 si no).
+            // Se valida aquí y no al pagar, para no rechazar una petición después de haber cobrado.
+            Optional.ofNullable(pedido.canalNotificacion())
+                    .ifPresent(canal -> notificadorDe(canal).validarDestino(pedido.contacto()));
             Pedido facturado = pedido.conComprobante(facturacion.facturar(pedido));
             pedidos.put(facturado.id(), facturado);
             return facturado;

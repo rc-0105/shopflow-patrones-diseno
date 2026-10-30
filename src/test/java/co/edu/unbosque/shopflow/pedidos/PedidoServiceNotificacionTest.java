@@ -65,6 +65,16 @@ class PedidoServiceNotificacionTest {
     }
 
     @Test
+    void unPedidoPorEmailConUnContactoSinArrobaEsRechazadoAntesDeCobrar() {
+        PedidoRequest conTelefono = new PedidoRequest("CLI-001", "1020304050", "CO", "3001234567",
+                List.of(new PedidoRequest.ItemRequest("SKU-001", 1)),
+                "Calle 134 # 9-51, Bogotá", false, null, null, false, "EMAIL");
+
+        assertThrows(IllegalArgumentException.class, () -> servicio.crear(conTelefono));
+        assertThrows(java.util.NoSuchElementException.class, () -> servicio.buscar("PED-1"));
+    }
+
+    @Test
     void unPedidoSinCanalSeSigueCreando() {
         Pedido pedido = servicio.crear(pedidoConCanal(null));
 
