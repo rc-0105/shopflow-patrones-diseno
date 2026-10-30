@@ -3,6 +3,7 @@ package co.edu.unbosque.shopflow.pagos;
 import co.edu.unbosque.shopflow.pagos.adaptadores.LegacyPayAdapter;
 import co.edu.unbosque.shopflow.pagos.adaptadores.QuickPayAdapter;
 import co.edu.unbosque.shopflow.pagos.decoradores.AuditoriaPago;
+import co.edu.unbosque.shopflow.pagos.decoradores.MetricasPago;
 import co.edu.unbosque.shopflow.pagos.decoradores.ReintentoPago;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,10 @@ public class ConfiguracionPagos {
     @Value("${shopflow.pagos.auditoria}")
     private boolean auditoria;
 
+    /** Reto B. Tiene valor por defecto para no tener que modificar application.properties. */
+    @Value("${shopflow.pagos.metricas:true}")
+    private boolean metricas;
+
     @Bean
     public PasarelasDePago pasarelasDePago(RegistroAuditoria registro) {
         return new PasarelasDePago(Map.of(
@@ -40,6 +45,9 @@ public class ConfiguracionPagos {
         PasarelaDePago pasarela = adapter;
         if (reintentos) {
             pasarela = new ReintentoPago(pasarela, maxIntentos);
+        }
+        if (metricas) {
+            pasarela = new MetricasPago(pasarela, proveedor);
         }
         if (auditoria) {
             pasarela = new AuditoriaPago(pasarela, proveedor, registro);
