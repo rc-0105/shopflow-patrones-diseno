@@ -1,0 +1,15 @@
+# Reto B (MetricasPago) · commit ef6dee4 sobre f01179b
+$ git diff --stat HEAD~1 HEAD
+ .../shopflow/pagos/ConfiguracionPagos.java         |  8 ++++
+ .../shopflow/pagos/decoradores/MetricasPago.java   | 48 ++++++++++++++++++++++
+ .../pagos/decoradores/MetricasPagoTest.java        | 39 ++++++++++++++++++
+ 3 files changed, 95 insertions(+)
+
+$ git diff --stat --diff-filter=A HEAD~1 HEAD   # archivos nuevos
+ .../shopflow/pagos/decoradores/MetricasPago.java   | 48 ++++++++++++++++++++++
+ .../pagos/decoradores/MetricasPagoTest.java        | 39 ++++++++++++++++++
+ 2 files changed, 87 insertions(+)
+
+$ git diff --stat --diff-filter=M HEAD~1 HEAD   # archivos existentes modificados (solo ConfiguracionPagos)
+ .../java/co/edu/unbosque/shopflow/pagos/ConfiguracionPagos.java   | 8 ++++++++
+ 1 file changed, 8 insertions(+)

@@ -1,0 +1,56 @@
+Escenario 7: Pagar el pedido PED-2 con LegacyPay y luego pagarlo con QuickPay
+Resultado esperado: Primer intento: 409 Conflict con "Fondos insuficientes". Segundo intento: 200 OK con estado PAGADO.
+
+
+1. Pago con LegacyPay (rechazado)
+Solicitud:
+curl -i -X POST localhost:8080/api/pedidos/PED-2/pago \
+-H "Content-Type: application/json" \
+-d '{"proveedor": "LEGACYPAY"}'
+
+Respuesta JSON:
+{
+  "error": "Fondos insuficientes"
+}
+
+
+2. Pago con QuickPay (exitoso)
+Solicitud:
+curl -i -X POST localhost:8080/api/pedidos/PED-2/pago \
+-H "Content-Type: application/json" \
+-d '{"proveedor": "QUICKPAY"}'
+
+Respuesta JSON:
+
+{
+  "id": "PED-2",
+  "estado": "PAGADO",
+  "clienteId": "CLI-002",
+  "pais": "CO",
+  "contacto": "ana@correo.com",
+  "items": [
+    {
+      "sku": "SKU-004",
+      "nombre": "Portátil 14 pulgadas",
+      "cantidad": 2,
+      "precioUnitario": 1450.00
+    }
+  ],
+  "direccionEnvio": "Calle 1",
+  "recogerEnTienda": false,
+  "envioExpress": false,
+  "cupon": null,
+  "notaRegalo": null,
+  "canalNotificacion": "EMAIL",
+  "subtotal": 2900.00,
+  "descuento": 0.00,
+  "comprobante": {
+    "tipo": "Factura electrónica (DIAN)",
+    "numero": "FE-CO-2",
+    "base": 2900.00,
+    "nombreImpuesto": "IVA 19%",
+    "impuesto": 551.00,
+    "total": 3451.00
+  },
+  "autorizacionPago": "QP-0b601a92"
+}
