@@ -32,12 +32,12 @@ mvn test              # pruebas unitarias JUnit 5
 
 | Patrón | Problema en ShopFlow (síntoma) | Participantes GoF → clases | Principio SOLID | Cuándo no usarlo |
 |---|---|---|---|---|
-| Factory Method | _(Rol C)_ | | | |
+| Factory Method | Al aprobarse un pago hay que notificar por el canal que eligió el cliente. Sin el patrón, `PedidoService` hace `new NotificacionEmail()` o `new NotificacionSms()` según un `if`, y cada canal nuevo (WhatsApp) obliga a modificarlo. | **Product:** `Notificacion` · **ConcreteProduct:** `NotificacionEmail`, `NotificacionSms` · **Creator:** `Notificador` (`notificarPagoAprobado()` final + método fábrica `crearNotificacion()`) · **ConcreteCreator:** `NotificadorEmail`, `NotificadorSms` · **Client:** `PedidoService` | **OCP:** un canal nuevo es una subclase nueva. **DIP:** `PedidoService` depende de `Notificador`, no de un canal concreto. **SRP:** la creación de cada notificación queda aislada en su creador. | Cuando hay un solo canal que no cambia: una jerarquía de creadores es más compleja que el `new` que reemplaza. Conviene empezar con un `new` y pasar al patrón cuando el condicional que elige la clase empiece a crecer. |
 | Abstract Factory | Cada país exige una familia de piezas que deben ir juntas (impuesto, documento del cliente, comprobante). Sin el patrón, un `if (pais.equals("CO"))` se repite en varias clases, es fácil mezclar el IVA de un país con el comprobante de otro y abrir Perú obliga a editar cada `if`. | **AbstractFactory:** `FabricaFacturacion` · **ConcreteFactory:** `FabricaColombia`, `FabricaMexico`, `FabricaPeru` · **AbstractProduct:** `CalculadoraImpuestos`, `ValidadorIdentificacion`, `GeneradorComprobante` · **ConcreteProduct:** `IvaColombia`, `ValidadorCedulaNit`, `GeneradorFacturaDian` (y sus equivalentes de MX y PE) · **Client:** `ServicioFacturacion` | **OCP:** un país nuevo es una fábrica nueva. **DIP:** `ServicioFacturacion` depende de interfaces, nunca de clases de un país. | Cuando no hay familias (un solo producto), o cuando la familia cambia de forma con frecuencia: agregar un producto nuevo obliga a modificar la interfaz y todas las fábricas concretas. |
 | Builder | Un pedido tiene 4 datos obligatorios, al menos un ítem y 6 opciones con reglas cruzadas (dirección obligatoria si no se recoge en tienda, tienda y express incompatibles, nota ≤ 140). Un constructor de 11 parámetros es fácil de llamar con dos `String` invertidos; con setters, el pedido existe a medias y puede quedar inválido. | **Product:** `Pedido` (inmutable) · **Builder:** `Pedido.Builder` (versión de Bloch, sin builder abstracto) · **Director / cliente:** `PedidoService.crear()` · **Parte:** `ItemPedido` | **SRP:** `Pedido` representa el pedido; `Pedido.Builder` se encarga de construirlo y validarlo. | Objetos con 2 o 3 parámetros, todos obligatorios: el builder duplica código sin aportar nada y hay que mantenerlo cada vez que el producto cambia de atributos. |
 | Adapter | _(Rol B)_ | | | |
 | Decorator | _(Rol B)_ | | | |
-| Proxy | _(Rol C)_ | | | |
+| Proxy | El catálogo es de otro equipo y tarda 1,5 s por consulta: un pedido de tres productos tarda 4,5 s solo en precios. Además, solo un ADMIN puede cambiar precios, y sin el patrón ese control se copia en cada lugar que cambia un precio. | **Subject:** `ServicioCatalogo` · **RealSubject:** `CatalogoRemoto` · **Proxy (caché):** `CatalogoCacheProxy` · **Proxy (protección):** `CatalogoProteccionProxy` · **Client:** `ProductoController`, `PedidoService` · **Composición:** `ConfiguracionCatalogo` | **OCP:** la caché y el control de acceso se agregan sin tocar `CatalogoRemoto`. **DIP:** los clientes reciben un `ServicioCatalogo` y no saben si hablan con el real o con un proxy. **SRP:** cada proxy tiene una sola responsabilidad. | Cuando el objeto real es barato y local: el proxy agrega una capa y, en el caso de la caché, el riesgo de servir datos viejos sin ganar nada. |
 
 ## 3. Patrones implementados
 
@@ -179,8 +179,119 @@ classDiagram
 
 ### 3.3 Adapter: _(Rol B)_
 ### 3.4 Decorator: _(Rol B)_
-### 3.5 Proxy: _(Rol C)_
-### 3.6 Factory Method: _(Rol C)_
+### 3.5 Proxy: `GET /api/productos/{sku}` y `PUT /api/productos/{sku}/precio`
+
+**Problema que resuelve.** Evitar los 1,5 s de `CatalogoRemoto` en cada consulta repetida y restringir el cambio de precios al rol ADMIN, sin que ningún cliente del catálogo sepa si habla con el objeto real o con un intermediario.
+
+```mermaid
+classDiagram
+    class ServicioCatalogo {
+        <<interface · Subject>>
+        +buscar(String sku) Producto
+        +listar() List~Producto~
+        +actualizarPrecio(String sku, BigDecimal) Producto
+    }
+    class CatalogoRemoto {
+        <<RealSubject · no se modifica>>
+    }
+    class CatalogoCacheProxy {
+        <<Proxy de caché>>
+        -ServicioCatalogo real
+        -ConcurrentHashMap~String, Producto~ cache
+    }
+    class CatalogoProteccionProxy {
+        <<Proxy de protección>>
+        -ServicioCatalogo real
+        -String rol
+    }
+    class ConfiguracionCatalogo {
+        <<Configuration>>
+        +servicioCatalogo() ServicioCatalogo
+    }
+    class ProductoController {
+        <<Client>>
+    }
+    ServicioCatalogo <|.. CatalogoRemoto
+    ServicioCatalogo <|.. CatalogoCacheProxy
+    ServicioCatalogo <|.. CatalogoProteccionProxy
+    CatalogoCacheProxy --> ServicioCatalogo : real
+    CatalogoProteccionProxy --> ServicioCatalogo : real
+    ConfiguracionCatalogo ..> CatalogoCacheProxy : envuelve a CatalogoRemoto
+    ProductoController --> ServicioCatalogo
+    ProductoController ..> CatalogoProteccionProxy : por petición, con X-Rol
+```
+
+**Decisiones de diseño**
+- `ConfiguracionCatalogo` es el **único** lugar que sabe que existe el proxy de caché: registra `new CatalogoCacheProxy(new CatalogoRemoto())` como el `ServicioCatalogo` de toda la aplicación. `PedidoService` y `ProductoController` reciben la interfaz.
+- La caché usa `computeIfAbsent`: solo llama al catálogo real si el SKU no está en memoria. Si el real lanza `NoSuchElementException`, no se guarda nada y la API responde 404.
+- Al cambiar un precio, el proxy de caché delega al real y **reemplaza** la entrada de su caché, para no servir un precio viejo.
+- El proxy de protección se crea **por petición** en `ProductoController`, porque el rol (encabezado `X-Rol`) cambia en cada una. Las consultas pasan directo; `actualizarPrecio` lanza `AccesoDenegadoException` (403) si el rol no es ADMIN.
+
+**Evidencia:** `evidencias/escenario-1.txt` (primera consulta de SKU-003 ≈ 1,5 s; la segunda < 0,05 s) y `evidencias/escenario-2.txt` (403 con `X-Rol: CLIENTE`, 200 con `X-Rol: ADMIN` y precio nuevo en la consulta siguiente). `CatalogoCacheProxyTest` demuestra con un catálogo falso que cuenta llamadas que dos búsquedas llegan una sola vez al real.
+
+### 3.6 Factory Method: `GET /api/notificaciones`
+
+**Problema que resuelve.** Notificar el pago aprobado por el canal del pedido con un proceso fijo (armar el mensaje, crear la notificación y enviarla), dejando que cada canal decida **qué** notificación crea. `PedidoService` no tiene ningún `new Notificacion...` ni un `if` por canal.
+
+```mermaid
+classDiagram
+    class Notificacion {
+        <<interface · Product>>
+        +enviar(String destino, String mensaje)
+    }
+    class NotificacionEmail {
+        <<ConcreteProduct>>
+    }
+    class NotificacionSms {
+        <<ConcreteProduct>>
+    }
+    class Notificador {
+        <<abstract · Creator>>
+        +canal() String
+        +notificarPagoAprobado(pedidoId, destino, totalPagado) void
+        #crearNotificacion() Notificacion
+    }
+    class NotificadorEmail {
+        <<ConcreteCreator · @Component>>
+    }
+    class NotificadorSms {
+        <<ConcreteCreator · @Component>>
+    }
+    class PedidoService {
+        <<Client>>
+        -Map~String, Notificador~ notificadores
+        +PedidoService(..., List~Notificador~)
+    }
+    class BandejaNotificaciones {
+        <<proyecto base>>
+    }
+    Notificacion <|.. NotificacionEmail
+    Notificacion <|.. NotificacionSms
+    Notificador <|-- NotificadorEmail
+    Notificador <|-- NotificadorSms
+    Notificador ..> Notificacion : crearNotificacion()
+    NotificadorEmail ..> NotificacionEmail
+    NotificadorSms ..> NotificacionSms
+    PedidoService --> Notificador
+    NotificacionEmail ..> BandejaNotificaciones
+    NotificacionSms ..> BandejaNotificaciones
+```
+
+| Canal | Producto | Regla propia |
+|---|---|---|
+| `EMAIL` | `NotificacionEmail` | El contacto debe tener «@» (si no, 400); el mensaje lleva el asunto `[Pago aprobado]`. |
+| `SMS` | `NotificacionSms` | El mensaje se recorta a 160 caracteres. |
+
+**Decisiones de diseño**
+- `notificarPagoAprobado(...)` es `final`: el proceso no lo puede alterar ninguna subclase. Lo único que varía es el método fábrica `protected abstract Notificacion crearNotificacion()`.
+- Spring inyecta en `PedidoService` **todos** los `Notificador` anotados con `@Component` como `List<Notificador>`, y el servicio arma un mapa por `canal()`, igual que `ServicioFacturacion` con las fábricas de país.
+- Un canal no soportado responde 400 **al crear el pedido**, con la lista de canales disponibles. Es un `Optional.orElseThrow` sobre el mapa, no un `if` por canal. `Pedido.Builder` solo pasa el canal a mayúsculas: no lo valida contra una lista fija, así el reto de WhatsApp no toca `Pedido`.
+- El canal es opcional (Anexo B.2): un pedido sin canal se crea igual y no se notifica.
+- Los productos concretos (`NotificacionEmail`, `NotificacionSms`) son *package-private*: fuera de `notificaciones` nadie puede nombrarlos.
+- Los notificadores reciben primitivas (`pedidoId`, `destino`, `totalPagado`) y no el `Pedido`, para que el paquete `notificaciones` no dependa de `pedidos`.
+- **Integración con el Rol B:** `PedidoService.notificarPagoAprobado(Pedido pagado)` usa el contacto del pedido y su total pagado (`totalAPagar()`). El método `pagar()` del Rol B debe llamarlo después de `pedido.pagado(...)` cuando el resultado del pago sea aprobado.
+
+**Evidencia:** escenario 8 del Anexo B (`GET /api/notificaciones`, una notificación por pago aprobado, en el canal del pedido). `NotificadorEmailTest.unContactoSinArrobaEsRechazado` demuestra que cada creador concreto produce su propio producto con sus reglas; `NotificadorSmsTest` y `PedidoServiceNotificacionTest` cubren el recorte del SMS, el 400 por canal no soportado y la notificación con el total pagado.
 
 ## 4. Retos de extensión
 
