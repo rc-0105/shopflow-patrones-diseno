@@ -32,7 +32,7 @@ mvn test              # pruebas unitarias JUnit 5
 
 | Patrón | Problema en ShopFlow (síntoma) | Participantes GoF → clases | Principio SOLID | Cuándo no usarlo |
 |---|---|---|---|---|
-| Factory Method | Al aprobarse un pago hay que notificar por el canal que eligió el cliente. Sin el patrón, `PedidoService` hace `new NotificacionEmail()` o `new NotificacionSms()` según un `if`, y cada canal nuevo (WhatsApp) obliga a modificarlo. | **Product:** `Notificacion` · **ConcreteProduct:** `NotificacionEmail`, `NotificacionSms` · **Creator:** `Notificador` (`notificarPagoAprobado()` final + método fábrica `crearNotificacion()`) · **ConcreteCreator:** `NotificadorEmail`, `NotificadorSms` · **Client:** `PedidoService` | **OCP:** un canal nuevo es una subclase nueva. **DIP:** `PedidoService` depende de `Notificador`, no de un canal concreto. **SRP:** la creación de cada notificación queda aislada en su creador. | Cuando hay un solo canal que no cambia: una jerarquía de creadores es más compleja que el `new` que reemplaza. Conviene empezar con un `new` y pasar al patrón cuando el condicional que elige la clase empiece a crecer. |
+| Factory Method | Al aprobarse un pago hay que notificar por el canal que eligió el cliente. Sin el patrón, `PedidoService` hace `new NotificacionEmail()` o `new NotificacionSms()` según un `if`, y cada canal nuevo (WhatsApp) obliga a modificarlo. | **Product:** `Notificacion` · **ConcreteProduct:** `NotificacionEmail`, `NotificacionSms`, `NotificacionWhatsApp` (reto) · **Creator:** `Notificador` (`notificarPagoAprobado()` final + método fábrica `crearNotificacion()`) · **ConcreteCreator:** `NotificadorEmail`, `NotificadorSms`, `NotificadorWhatsApp` (reto) · **Client:** `PedidoService` | **OCP:** un canal nuevo es una subclase nueva. **DIP:** `PedidoService` depende de `Notificador`, no de un canal concreto. **SRP:** la creación de cada notificación queda aislada en su creador. | Cuando hay un solo canal que no cambia: una jerarquía de creadores es más compleja que el `new` que reemplaza. Conviene empezar con un `new` y pasar al patrón cuando el condicional que elige la clase empiece a crecer. |
 | Abstract Factory | Cada país exige una familia de piezas que deben ir juntas (impuesto, documento del cliente, comprobante). Sin el patrón, un `if (pais.equals("CO"))` se repite en varias clases, es fácil mezclar el IVA de un país con el comprobante de otro y abrir Perú obliga a editar cada `if`. | **AbstractFactory:** `FabricaFacturacion` · **ConcreteFactory:** `FabricaColombia`, `FabricaMexico`, `FabricaPeru` · **AbstractProduct:** `CalculadoraImpuestos`, `ValidadorIdentificacion`, `GeneradorComprobante` · **ConcreteProduct:** `IvaColombia`, `ValidadorCedulaNit`, `GeneradorFacturaDian` (y sus equivalentes de MX y PE) · **Client:** `ServicioFacturacion` | **OCP:** un país nuevo es una fábrica nueva. **DIP:** `ServicioFacturacion` depende de interfaces, nunca de clases de un país. | Cuando no hay familias (un solo producto), o cuando la familia cambia de forma con frecuencia: agregar un producto nuevo obliga a modificar la interfaz y todas las fábricas concretas. |
 | Builder | Un pedido tiene 4 datos obligatorios, al menos un ítem y 6 opciones con reglas cruzadas (dirección obligatoria si no se recoge en tienda, tienda y express incompatibles, nota ≤ 140). Un constructor de 11 parámetros es fácil de llamar con dos `String` invertidos; con setters, el pedido existe a medias y puede quedar inválido. | **Product:** `Pedido` (inmutable) · **Builder:** `Pedido.Builder` (versión de Bloch, sin builder abstracto) · **Director / cliente:** `PedidoService.crear()` · **Parte:** `ItemPedido` | **SRP:** `Pedido` representa el pedido; `Pedido.Builder` se encarga de construirlo y validarlo. | Objetos con 2 o 3 parámetros, todos obligatorios: el builder duplica código sin aportar nada y hay que mantenerlo cada vez que el producto cambia de atributos. |
 | Adapter | ShopFlow cobra con LegacyPay (monto en centavos, respuesta de texto `"00\|LP4051"`, su propia `LegacyPayTimeoutException`) y con QuickPay (monto `double`, enum propio). Los SDK no se pueden modificar. Sin el patrón, los centavos, los códigos `"00\|…"` y los enums del proveedor quedan regados por la lógica de negocio, y cambiar de proveedor obliga a reescribirla. | **Target:** `PasarelaDePago` · **Adapter:** `LegacyPayAdapter`, `QuickPayAdapter` · **Adaptee:** `LegacyPayClient`, `QuickPaySdk` (paquete `externos`) · **Client:** `PedidoService` | **DIP:** el dominio depende de `PasarelaDePago`, una abstracción propia, y nunca del SDK. **SRP:** toda la traducción de un proveedor vive en una sola clase. **OCP:** un proveedor nuevo es un adapter nuevo. | Cuando se controlan las dos interfaces: es más simple alinearlas. Y cuando la intención es simplificar un subsistema completo, porque eso es Facade. |
@@ -372,6 +372,9 @@ classDiagram
     class NotificacionSms {
         <<ConcreteProduct>>
     }
+    class NotificacionWhatsApp {
+        <<ConcreteProduct · reto>>
+    }
     class Notificador {
         <<abstract · Creator>>
         +canal() String
@@ -383,6 +386,9 @@ classDiagram
     }
     class NotificadorSms {
         <<ConcreteCreator · @Component>>
+    }
+    class NotificadorWhatsApp {
+        <<ConcreteCreator · reto>>
     }
     class PedidoService {
         <<Client>>
@@ -396,18 +402,23 @@ classDiagram
     Notificacion <|.. NotificacionSms
     Notificador <|-- NotificadorEmail
     Notificador <|-- NotificadorSms
+    Notificacion <|.. NotificacionWhatsApp
+    Notificador <|-- NotificadorWhatsApp
     Notificador ..> Notificacion : crearNotificacion()
     NotificadorEmail ..> NotificacionEmail
     NotificadorSms ..> NotificacionSms
+    NotificadorWhatsApp ..> NotificacionWhatsApp
     PedidoService --> Notificador
     NotificacionEmail ..> BandejaNotificaciones
     NotificacionSms ..> BandejaNotificaciones
+    NotificacionWhatsApp ..> BandejaNotificaciones
 ```
 
 | Canal | Producto | Regla propia |
 |---|---|---|
 | `EMAIL` | `NotificacionEmail` | El contacto debe tener «@» (si no, 400); el mensaje lleva el asunto `[Pago aprobado]`. |
 | `SMS` | `NotificacionSms` | El mensaje se recorta a 160 caracteres. |
+| `WHATSAPP` (reto C) | `NotificacionWhatsApp` | El contacto debe ser un número con indicativo, ej. `+573001234567` (si no, 400); el mensaje empieza con «✅». |
 
 **Decisiones de diseño**
 - `notificarPagoAprobado(...)` es `final`: el proceso no lo puede alterar ninguna subclase. Lo único que varía es el método fábrica `protected abstract Notificacion crearNotificacion()`.
@@ -441,7 +452,32 @@ src/test/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeruTest.java
 **Evidencia:** `evidencias/reto-a-git-diff-stat.txt` _(pegar aquí la salida de `git diff --stat` del commit del reto)_.
 
 ### Reto B: Métricas: _(Rol B)_
-### Reto C: WhatsApp: _(Rol C)_
+### Reto C: WhatsApp (Factory Method)
+
+**Qué se pidió.** Agregar `NotificadorWhatsApp`: exige un número con indicativo (por ejemplo, `+573001234567`) y antepone «✅» al mensaje. Un pedido con `"canalNotificacion": "WHATSAPP"` debe notificarse. **Qué se puede modificar: nada, solo archivos nuevos.**
+
+**Archivos del reto (todos nuevos):**
+```
+src/main/java/co/edu/unbosque/shopflow/notificaciones/NotificacionWhatsApp.java
+src/main/java/co/edu/unbosque/shopflow/notificaciones/NotificadorWhatsApp.java
+src/test/java/co/edu/unbosque/shopflow/notificaciones/NotificadorWhatsAppTest.java
+src/test/java/co/edu/unbosque/shopflow/pedidos/PedidoServiceWhatsAppTest.java
+evidencias/reto-c-whatsapp.txt
+```
+
+**Cómo se resolvió.**
+- `NotificacionWhatsApp` (producto concreto, *package-private*) implementa `Notificacion`. Sobrescribe `validarDestino(...)` para exigir `+` seguido de 8 a 15 dígitos (formato E.164) y `enviar(...)` registra en `BandejaNotificaciones` el mensaje con «✅ » adelante.
+- `NotificadorWhatsApp` (creador concreto, `@Component`) extiende `Notificador`: `canal()` devuelve `WHATSAPP` y `crearNotificacion()` entrega un `NotificacionWhatsApp`. El proceso `notificarPagoAprobado(...)` lo hereda sin cambios.
+
+**Por qué no hubo que tocar nada:**
+- Spring encuentra el nuevo `@Component` y lo agrega a la `List<Notificador>` que recibe `PedidoService`, que lo indexa por `canal()`. El canal `WHATSAPP` aparece solo en el mapa (y en el mensaje de error de un canal no soportado: `Canales disponibles: [WHATSAPP, SMS, EMAIL]`).
+- `Pedido.Builder` nunca validó el canal contra una lista fija, así que acepta `WHATSAPP` sin cambios.
+- La validación del número al **crear** el pedido sale gratis: `PedidoService.crear()` ya llama a `Notificador.validarDestino(...)`, que delega en el producto. Un pedido WhatsApp sin indicativo responde 400 antes de cobrar.
+
+**Evidencia:**
+- `evidencias/reto-c-git-diff-stat.txt`: el commit del reto (`97e8b1d`) tiene 5 archivos, todos con estado `A` (agregado), 182 inserciones y 0 eliminaciones.
+- `evidencias/reto-c-whatsapp.txt`: pedido con `+573001234567` → 201; pago → 200; `GET /api/notificaciones` → `"✅ ShopFlow: el pago del pedido PED-1 fue aprobado. Total pagado: 30.35 USD."`; pedido WhatsApp con `3001234567` → 400.
+- Pruebas: `NotificadorWhatsAppTest` (canal, prefijo «✅», número sin indicativo, correo o letras rechazados) y `PedidoServiceWhatsAppTest` (un pedido WHATSAPP se notifica tras el pago, sin modificar `PedidoService`).
 
 ## 5. Preguntas de reflexión
 
