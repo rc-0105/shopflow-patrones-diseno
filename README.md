@@ -8,7 +8,7 @@ Ingeniería de Software 2 · Taller: patrones de diseño creacionales y estructu
 |---|---|---|---|
 | Ricardo | A | Builder · Abstract Factory | Perú (`FabricaPeru`) |
 | _Samuel_ | B | Adapter · Decorator | Métricas (`MetricasPago`) |
-| _(pendiente)_ | C | Proxy · Factory Method | WhatsApp (`NotificadorWhatsApp`) |
+| Nicolás | C | Proxy · Factory Method | WhatsApp (`NotificadorWhatsApp`) |
 
 Requisitos: Java 17 o superior y Maven (o un IDE con soporte para Maven).
 
