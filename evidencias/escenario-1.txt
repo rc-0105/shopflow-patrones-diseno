@@ -1,5 +1,7 @@
 # Escenario 1: cache del proxy (dos consultas de SKU-003, tiempo en segundos)
-$ curl -s -o /dev/null -w "%{time_total}\n" localhost:8080/api/productos/SKU-003
-1.546033
-$ curl -s -o /dev/null -w "%{time_total}\n" localhost:8080/api/productos/SKU-003
-0.003436
+$ curl -s -o /dev/null -w '%{time_total}' localhost:8080/api/productos/SKU-003
+1.525290
+
+$ curl -s -o /dev/null -w '%{time_total}' localhost:8080/api/productos/SKU-003
+0.002486
+

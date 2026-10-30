@@ -1,0 +1,7 @@
+# Escenario 8: auditoria (una entrada por cobro) y notificaciones (una por pago aprobado)
+$ curl -s localhost:8080/api/pagos/auditoria
+[{"fecha":"2026-10-30T13:23:49.925229800Z","proveedor":"LEGACYPAY","referencia":"PED-1","montoUsd":145.66,"resultado":"APROBADO","duracionMs":617},{"fecha":"2026-10-30T13:23:52.124154300Z","proveedor":"LEGACYPAY","referencia":"PED-3","montoUsd":3451.00,"resultado":"RECHAZADO: Fondos insuficientes","duracionMs":624},{"fecha":"2026-10-30T13:23:52.147168200Z","proveedor":"QUICKPAY","referencia":"PED-3","montoUsd":3451.00,"resultado":"APROBADO","duracionMs":1}]
+
+$ curl -s localhost:8080/api/notificaciones
+[{"canal":"EMAIL","destino":"ana.perez@correo.com","mensaje":"[Pago aprobado] ShopFlow: el pago del pedido PED-1 fue aprobado. Total pagado: 145.66 USD.","fecha":"2026-10-30T08:23:49.9252298"},{"canal":"SMS","destino":"+573001234567","mensaje":"ShopFlow: el pago del pedido PED-3 fue aprobado. Total pagado: 3451.00 USD.","fecha":"2026-10-30T08:23:52.1471682"}]
+

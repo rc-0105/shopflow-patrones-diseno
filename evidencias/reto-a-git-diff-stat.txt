@@ -1,0 +1,16 @@
+# Reto A - Peru (Abstract Factory)
+# Commit: 013e87d feat(facturacion): agregar FabricaPeru (reto A)
+$ git diff --stat HEAD~1 HEAD
+ .../shopflow/facturacion/peru/FabricaPeru.java     | 35 ++++++++++++++++
+ .../facturacion/peru/GeneradorFacturaSunat.java    | 21 ++++++++++
+ .../shopflow/facturacion/peru/IgvPeru.java         | 20 +++++++++
+ .../shopflow/facturacion/peru/ValidadorRuc.java    | 14 +++++++
+ .../shopflow/facturacion/peru/FabricaPeruTest.java | 48 ++++++++++++++++++++++
+ 5 files changed, 138 insertions(+)
+
+$ git diff --name-status HEAD~1 HEAD   (A = archivo nuevo)
+A	src/main/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeru.java
+A	src/main/java/co/edu/unbosque/shopflow/facturacion/peru/GeneradorFacturaSunat.java
+A	src/main/java/co/edu/unbosque/shopflow/facturacion/peru/IgvPeru.java
+A	src/main/java/co/edu/unbosque/shopflow/facturacion/peru/ValidadorRuc.java
+A	src/test/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeruTest.java
