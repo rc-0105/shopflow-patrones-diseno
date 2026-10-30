@@ -35,8 +35,8 @@ mvn test              # pruebas unitarias JUnit 5
 | Factory Method | _(Rol C)_ | | | |
 | Abstract Factory | Cada país exige una familia de piezas que deben ir juntas (impuesto, documento del cliente, comprobante). Sin el patrón, un `if (pais.equals("CO"))` se repite en varias clases, es fácil mezclar el IVA de un país con el comprobante de otro y abrir Perú obliga a editar cada `if`. | **AbstractFactory:** `FabricaFacturacion` · **ConcreteFactory:** `FabricaColombia`, `FabricaMexico`, `FabricaPeru` · **AbstractProduct:** `CalculadoraImpuestos`, `ValidadorIdentificacion`, `GeneradorComprobante` · **ConcreteProduct:** `IvaColombia`, `ValidadorCedulaNit`, `GeneradorFacturaDian` (y sus equivalentes de MX y PE) · **Client:** `ServicioFacturacion` | **OCP:** un país nuevo es una fábrica nueva. **DIP:** `ServicioFacturacion` depende de interfaces, nunca de clases de un país. | Cuando no hay familias (un solo producto), o cuando la familia cambia de forma con frecuencia: agregar un producto nuevo obliga a modificar la interfaz y todas las fábricas concretas. |
 | Builder | Un pedido tiene 4 datos obligatorios, al menos un ítem y 6 opciones con reglas cruzadas (dirección obligatoria si no se recoge en tienda, tienda y express incompatibles, nota ≤ 140). Un constructor de 11 parámetros es fácil de llamar con dos `String` invertidos; con setters, el pedido existe a medias y puede quedar inválido. | **Product:** `Pedido` (inmutable) · **Builder:** `Pedido.Builder` (versión de Bloch, sin builder abstracto) · **Director / cliente:** `PedidoService.crear()` · **Parte:** `ItemPedido` | **SRP:** `Pedido` representa el pedido; `Pedido.Builder` se encarga de construirlo y validarlo. | Objetos con 2 o 3 parámetros, todos obligatorios: el builder duplica código sin aportar nada y hay que mantenerlo cada vez que el producto cambia de atributos. |
-| Adapter | _(Rol B)_ | | | |
-| Decorator | _(Rol B)_ | | | |
+| Adapter | ShopFlow cobra con LegacyPay (monto en centavos, respuesta de texto `"00\|LP4051"`, su propia `LegacyPayTimeoutException`) y con QuickPay (monto `double`, enum propio). Los SDK no se pueden modificar. Sin el patrón, los centavos, los códigos `"00\|…"` y los enums del proveedor quedan regados por la lógica de negocio, y cambiar de proveedor obliga a reescribirla. | **Target:** `PasarelaDePago` · **Adapter:** `LegacyPayAdapter`, `QuickPayAdapter` · **Adaptee:** `LegacyPayClient`, `QuickPaySdk` (paquete `externos`) · **Client:** `PedidoService` | **DIP:** el dominio depende de `PasarelaDePago`, una abstracción propia, y nunca del SDK. **SRP:** toda la traducción de un proveedor vive en una sola clase. **OCP:** un proveedor nuevo es un adapter nuevo. | Cuando se controlan las dos interfaces: es más simple alinearlas. Y cuando la intención es simplificar un subsistema completo, porque eso es Facade. |
+| Decorator | LegacyPay falla por timeout el 30 % de las veces, auditoría exige registrar cada cobro y en pruebas los reintentos deben poder apagarse. Con herencia harían falta `LegacyPayConReintento`, `LegacyPayConAuditoria`, `LegacyPayConReintentoYAuditoria`… por cada proveedor: una explosión de clases. | **Component:** `PasarelaDePago` · **ConcreteComponent:** `LegacyPayAdapter`, `QuickPayAdapter` · **Decorator:** `PasarelaDecorator` · **ConcreteDecorator:** `ReintentoPago`, `AuditoriaPago`, `MetricasPago` (reto) · **Ensamblador:** `ConfiguracionPagos` | **OCP:** una capa nueva es una clase nueva. **SRP:** cada decorador hace una sola cosa. **LSP:** una pasarela decorada se usa donde se espera cualquier `PasarelaDePago`. | Cuando las combinaciones son pocas y fijas (dos subclases bastan), cuando el cliente depende del tipo concreto, o cuando una capa necesita saber qué otras capas hay en la cadena. |
 | Proxy | _(Rol C)_ | | | |
 
 ## 3. Patrones implementados
@@ -177,8 +177,134 @@ classDiagram
 
 **Evidencia:** escenarios 3 y 5 del Anexo B. `ServicioFacturacionTest.pedidoDeMexicoConCedulaColombianaEsRechazado` demuestra que las piezas de una familia no se mezclan.
 
-### 3.3 Adapter: _(Rol B)_
-### 3.4 Decorator: _(Rol B)_
+### 3.3 Adapter: `POST /api/pedidos/{id}/pago`
+
+**Problema que resuelve.** Hacer que dos SDK ajenos e incompatibles entre sí se vean como una sola interfaz de ShopFlow, `PasarelaDePago.cobrar(BigDecimal montoUsd, String referencia)`. Así el dominio nunca ve centavos, códigos de texto, enums ni excepciones del proveedor.
+
+```mermaid
+classDiagram
+    class PasarelaDePago {
+        <<interface · Target>>
+        +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+    }
+    class LegacyPayAdapter {
+        <<Adapter>>
+        -LegacyPayClient cliente
+        +cobrar(montoUsd, referencia) ResultadoPago
+    }
+    class QuickPayAdapter {
+        <<Adapter>>
+        -QuickPaySdk sdk
+        +cobrar(montoUsd, referencia) ResultadoPago
+    }
+    class LegacyPayClient {
+        <<Adaptee · externos>>
+        +makeCharge(long amountInCents, String currency, String reference) String
+    }
+    class QuickPaySdk {
+        <<Adaptee · externos>>
+        +pay(QuickPayRequest) QuickPayResult
+    }
+    class PedidoService {
+        <<Client>>
+        +pagar(String id, String proveedor) Pedido
+    }
+    PasarelaDePago <|.. LegacyPayAdapter
+    PasarelaDePago <|.. QuickPayAdapter
+    LegacyPayAdapter o-- LegacyPayClient : composición
+    QuickPayAdapter o-- QuickPaySdk : composición
+    PedidoService --> PasarelaDePago
+```
+
+| Traducción | LegacyPayAdapter | QuickPayAdapter |
+|---|---|---|
+| Monto | `BigDecimal` USD → `long` centavos (`HALF_UP`) | `BigDecimal` → `double` |
+| Respuesta | `"00\|LP…"` → aprobado · `"51\|"` → «Fondos insuficientes» · otro código → «Transacción no permitida» | `OK` → aprobado · `REJECTED` / `ERROR` → rechazado |
+| Error | `LegacyPayTimeoutException` → `PasarelaNoDisponibleException` (503) | — |
+
+**Decisiones de diseño**
+- Son adaptadores **de objeto** (composición), no de clase. Cada uno tiene dos constructores: uno recibe el SDK (para las pruebas, con `new LegacyPayClient(0.0)` o `(1.0)`) y otro lo crea por dentro. Así `ConfiguracionPagos` no importa nada de `externos`. Solo los dos adapters lo importan, y se verifica con `grep -rl "shopflow.externos" src/main/java`.
+- `PedidoService.pagar()` cobra `pedido.totalAPagar()`. Si la pasarela rechaza, lanza `IllegalStateException` con el mensaje del rechazo (409). Si aprueba, guarda `pedido.pagado(autorizacion)`.
+- Un pedido ya pagado responde 409 **antes** de llamar a la pasarela, para no cobrarle dos veces al cliente. El cobro ocurre dentro de `ConcurrentHashMap.compute()`, que bloquea ese pedido mientras se cobra. Dos pagos simultáneos del mismo pedido no generan dos cobros.
+- Las pasarelas armadas llegan a `PedidoService` dentro de `PasarelasDePago`, una clase propia y no un `Map<String, PasarelaDePago>` suelto. Si Spring ve un `Map<String, X>` en un constructor, lo llena con todos los beans de tipo `X`. Un proveedor desconocido responde 400.
+
+**Evidencia:** escenarios 6 y 7 del Anexo B. Pagar dos veces da 409. Dos portátiles (3.451 USD) con LegacyPay dan 409 «Fondos insuficientes», y el mismo pedido con QuickPay da 200. Con `--shopflow.pagos.reintentos=false --shopflow.legacypay.probabilidad-timeout=1.0`, el pago con LegacyPay responde 503 y no 500. Pruebas: `LegacyPayAdapterTest`, `QuickPayAdapterTest` y `PedidoServicePagoTest`.
+
+### 3.4 Decorator: `GET /api/pagos/auditoria`
+
+**Problema que resuelve.** Agregar reintentos, auditoría (y en el reto, métricas) a cualquier pasarela sin crear una subclase por combinación. Las capas se activan o se apagan desde `application.properties`.
+
+```mermaid
+classDiagram
+    class PasarelaDePago {
+        <<interface · Component>>
+        +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+    }
+    class LegacyPayAdapter {
+        <<ConcreteComponent>>
+    }
+    class QuickPayAdapter {
+        <<ConcreteComponent>>
+    }
+    class PasarelaDecorator {
+        <<abstract · Decorator>>
+        #PasarelaDePago envuelta
+        +cobrar(montoUsd, referencia) ResultadoPago
+    }
+    class ReintentoPago {
+        <<ConcreteDecorator>>
+        -int maxIntentos
+    }
+    class AuditoriaPago {
+        <<ConcreteDecorator>>
+        -String proveedor
+        -RegistroAuditoria registro
+    }
+    class MetricasPago {
+        <<ConcreteDecorator · reto>>
+        -int cobros
+        -int aprobados
+    }
+    class RegistroAuditoria {
+        <<Component Spring>>
+        +registrar(EntradaAuditoria)
+        +entradas() List
+    }
+    class ConfiguracionPagos {
+        <<punto de composición>>
+        +pasarelasDePago(RegistroAuditoria) PasarelasDePago
+    }
+    PasarelaDePago <|.. LegacyPayAdapter
+    PasarelaDePago <|.. QuickPayAdapter
+    PasarelaDePago <|.. PasarelaDecorator
+    PasarelaDecorator o-- PasarelaDePago : envuelta
+    PasarelaDecorator <|-- ReintentoPago
+    PasarelaDecorator <|-- AuditoriaPago
+    PasarelaDecorator <|-- MetricasPago
+    AuditoriaPago --> RegistroAuditoria
+    ConfiguracionPagos ..> PasarelaDecorator : arma las capas
+```
+
+Cadena que arma `ConfiguracionPagos` para cada proveedor (de afuera hacia adentro):
+
+```
+AuditoriaPago → MetricasPago → ReintentoPago → LegacyPayAdapter / QuickPayAdapter
+```
+
+| Propiedad | Efecto |
+|---|---|
+| `shopflow.pagos.reintentos=true` | Agrega `ReintentoPago` con `shopflow.pagos.max-intentos` intentos |
+| `shopflow.pagos.auditoria=true` | Agrega `AuditoriaPago`, por fuera del reintento |
+| `shopflow.pagos.metricas` (opcional, `true` por defecto) | Agrega `MetricasPago` (reto B) |
+
+**Decisiones de diseño**
+- `PasarelaDecorator` **es** una `PasarelaDePago` y **tiene** una `PasarelaDePago`, a la que delega por defecto. Cada decorador concreto sobrescribe `cobrar()` y llama a `super.cobrar(...)`.
+- `ReintentoPago` reintenta solo cuando recibe `PasarelaNoDisponibleException`. Un rechazo («Fondos insuficientes») es una respuesta válida del proveedor y no se reintenta. Si se agotan los intentos, propaga la última excepción (503).
+- `AuditoriaPago` registra también los cobros que terminan en excepción (`"ERROR: …"`) y luego deja pasar la excepción. Así auditoría tiene **todos** los cobros, incluidos los que fallaron.
+- La auditoría va **por fuera** del reintento, así queda una entrada por cobro y no una por intento. `AuditoriaPagoTest` prueba los dos órdenes.
+- `ConfiguracionPagos` es el único lugar que conoce los adapters y decoradores concretos. Cambiar las propiedades cambia las capas sin modificar ninguna clase.
+
+**Evidencia:** escenario 8 del Anexo B (`GET /api/pagos/auditoria`). Cada entrada trae `proveedor`, `referencia`, `montoUsd`, `resultado` y `duracionMs`. Pruebas: `ReintentoPagoTest` y `AuditoriaPagoTest`.
 ### 3.5 Proxy: _(Rol C)_
 ### 3.6 Factory Method: _(Rol C)_
 
