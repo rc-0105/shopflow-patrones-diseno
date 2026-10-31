@@ -714,7 +714,7 @@ src/test/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeruTest.java
 
 **Por qué no hubo que tocar nada:** `FabricaPeru` es un `@Component` que implementa `FabricaFacturacion`. Spring la agrega a la `List<FabricaFacturacion>` que recibe `ServicioFacturacion`, y ella aparece sola en el mapa con la clave `PE`. `Pedido.Builder` tampoco cambia, porque nunca validó contra una lista fija de países.
 
-**Evidencia:** `evidencias/reto-a-git-diff-stat.txt` _(pegar aquí la salida de `git diff --stat` del commit del reto)_.
+**Evidencia:** `evidencias/reto-a-git-diff-stat.txt`.
 
 
 ### Reto B: Métricas (Decorator)
