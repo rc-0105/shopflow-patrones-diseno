@@ -7,6 +7,8 @@ import co.edu.unbosque.shopflow.catalogo.Producto;
 import co.edu.unbosque.shopflow.catalogo.ServicioCatalogo;
 import co.edu.unbosque.shopflow.facturacion.ServicioFacturacion;
 import co.edu.unbosque.shopflow.facturacion.colombia.FabricaColombia;
+import co.edu.unbosque.shopflow.notificaciones.BandejaNotificaciones;
+import co.edu.unbosque.shopflow.notificaciones.NotificadorEmail;
 import co.edu.unbosque.shopflow.pagos.PasarelaDePago;
 import co.edu.unbosque.shopflow.pagos.PasarelasDePago;
 import co.edu.unbosque.shopflow.pagos.ResultadoPago;
@@ -41,7 +43,8 @@ class PedidoServicePagoTest {
 
     private PedidoService servicio(Map<String, PasarelaDePago> pasarelas) {
         return new PedidoService(catalogo,
-                new ServicioFacturacion(List.of(new FabricaColombia())), new PasarelasDePago(pasarelas));
+                new ServicioFacturacion(List.of(new FabricaColombia())), new PasarelasDePago(pasarelas),
+                List.of(new NotificadorEmail(new BandejaNotificaciones())));
     }
 
     private PedidoRequest pedidoDeDosPortatiles() {

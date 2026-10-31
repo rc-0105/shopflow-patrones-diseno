@@ -1,0 +1,19 @@
+# Escenario 5: Mexico con RFC valido (201); Mexico con cedula colombiana (400)
+$ curl -s -i -X POST localhost:8080/api/pedidos -H 'Content-Type: application/json' -d @pedido-mx-rfc.json
+HTTP/1.1 201 
+Location: /api/pedidos/PED-2
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Fri, 30 Oct 2026 13:23:49 GMT
+
+{"id":"PED-2","estado":"CREADO","clienteId":"CLI-004","pais":"MX","contacto":"+525512345678","items":[{"sku":"SKU-001","nombre":"Teclado mecánico","cantidad":1,"precioUnitario":85.00}],"direccionEnvio":"Av. Reforma 222, CDMX","recogerEnTienda":false,"envioExpress":false,"cupon":null,"notaRegalo":null,"canalNotificacion":null,"subtotal":85.00,"descuento":0.00,"comprobante":{"tipo":"CFDI (SAT)","numero":"CFDI-MX-1","base":85.00,"nombreImpuesto":"IVA 16%","impuesto":13.60,"total":98.60},"autorizacionPago":null}
+
+$ curl -s -i -X POST localhost:8080/api/pedidos -H 'Content-Type: application/json' -d @pedido-mx-cedula.json
+HTTP/1.1 400 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Fri, 30 Oct 2026 13:23:49 GMT
+Connection: close
+
+{"error":"Documento inválido para México: se esperaba un RFC (ej. GODE561231GR8)"}
+

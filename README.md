@@ -7,8 +7,8 @@ Ingeniería de Software 2 · Taller: patrones de diseño creacionales y estructu
 | Integrante | Rol | Patrones | Reto de extensión |
 |---|---|---|---|
 | Ricardo | A | Builder · Abstract Factory | Perú (`FabricaPeru`) |
-| _(pendiente)_ | B | Adapter · Decorator | Métricas (`MetricasPago`) |
-| _(pendiente)_ | C | Proxy · Factory Method | WhatsApp (`NotificadorWhatsApp`) |
+| _Samuel_ | B | Adapter · Decorator | Métricas (`MetricasPago`) |
+| Nicolás | C | Proxy · Factory Method | WhatsApp (`NotificadorWhatsApp`) |
 
 Requisitos: Java 17 o superior y Maven (o un IDE con soporte para Maven).
 
@@ -32,12 +32,12 @@ mvn test              # pruebas unitarias JUnit 5
 
 | Patrón | Problema en ShopFlow (síntoma) | Participantes GoF → clases | Principio SOLID | Cuándo no usarlo |
 |---|---|---|---|---|
-| Factory Method | _(Rol C)_ | | | |
+| Factory Method | Al aprobarse un pago hay que notificar por el canal que eligió el cliente. Sin el patrón, `PedidoService` hace `new NotificacionEmail()` o `new NotificacionSms()` según un `if`, y cada canal nuevo (WhatsApp) obliga a modificarlo. | **Product:** `Notificacion` · **ConcreteProduct:** `NotificacionEmail`, `NotificacionSms`, `NotificacionWhatsApp` (reto) · **Creator:** `Notificador` (`notificarPagoAprobado()` final + método fábrica `crearNotificacion()`) · **ConcreteCreator:** `NotificadorEmail`, `NotificadorSms`, `NotificadorWhatsApp` (reto) · **Client:** `PedidoService` | **OCP:** un canal nuevo es una subclase nueva. **DIP:** `PedidoService` depende de `Notificador`, no de un canal concreto. **SRP:** la creación de cada notificación queda aislada en su creador. | Cuando hay un solo canal que no cambia: una jerarquía de creadores es más compleja que el `new` que reemplaza. Conviene empezar con un `new` y pasar al patrón cuando el condicional que elige la clase empiece a crecer. |
 | Abstract Factory | Cada país exige una familia de piezas que deben ir juntas (impuesto, documento del cliente, comprobante). Sin el patrón, un `if (pais.equals("CO"))` se repite en varias clases, es fácil mezclar el IVA de un país con el comprobante de otro y abrir Perú obliga a editar cada `if`. | **AbstractFactory:** `FabricaFacturacion` · **ConcreteFactory:** `FabricaColombia`, `FabricaMexico`, `FabricaPeru` · **AbstractProduct:** `CalculadoraImpuestos`, `ValidadorIdentificacion`, `GeneradorComprobante` · **ConcreteProduct:** `IvaColombia`, `ValidadorCedulaNit`, `GeneradorFacturaDian` (y sus equivalentes de MX y PE) · **Client:** `ServicioFacturacion` | **OCP:** un país nuevo es una fábrica nueva. **DIP:** `ServicioFacturacion` depende de interfaces, nunca de clases de un país. | Cuando no hay familias (un solo producto), o cuando la familia cambia de forma con frecuencia: agregar un producto nuevo obliga a modificar la interfaz y todas las fábricas concretas. |
 | Builder | Un pedido tiene 4 datos obligatorios, al menos un ítem y 6 opciones con reglas cruzadas (dirección obligatoria si no se recoge en tienda, tienda y express incompatibles, nota ≤ 140). Un constructor de 11 parámetros es fácil de llamar con dos `String` invertidos; con setters, el pedido existe a medias y puede quedar inválido. | **Product:** `Pedido` (inmutable) · **Builder:** `Pedido.Builder` (versión de Bloch, sin builder abstracto) · **Director / cliente:** `PedidoService.crear()` · **Parte:** `ItemPedido` | **SRP:** `Pedido` representa el pedido; `Pedido.Builder` se encarga de construirlo y validarlo. | Objetos con 2 o 3 parámetros, todos obligatorios: el builder duplica código sin aportar nada y hay que mantenerlo cada vez que el producto cambia de atributos. |
 | Adapter | ShopFlow cobra con LegacyPay (monto en centavos, respuesta de texto `"00\|LP4051"`, su propia `LegacyPayTimeoutException`) y con QuickPay (monto `double`, enum propio). Los SDK no se pueden modificar. Sin el patrón, los centavos, los códigos `"00\|…"` y los enums del proveedor quedan regados por la lógica de negocio, y cambiar de proveedor obliga a reescribirla. | **Target:** `PasarelaDePago` · **Adapter:** `LegacyPayAdapter`, `QuickPayAdapter` · **Adaptee:** `LegacyPayClient`, `QuickPaySdk` (paquete `externos`) · **Client:** `PedidoService` | **DIP:** el dominio depende de `PasarelaDePago`, una abstracción propia, y nunca del SDK. **SRP:** toda la traducción de un proveedor vive en una sola clase. **OCP:** un proveedor nuevo es un adapter nuevo. | Cuando se controlan las dos interfaces: es más simple alinearlas. Y cuando la intención es simplificar un subsistema completo, porque eso es Facade. |
 | Decorator | LegacyPay falla por timeout el 30 % de las veces, auditoría exige registrar cada cobro y en pruebas los reintentos deben poder apagarse. Con herencia harían falta `LegacyPayConReintento`, `LegacyPayConAuditoria`, `LegacyPayConReintentoYAuditoria`… por cada proveedor: una explosión de clases. | **Component:** `PasarelaDePago` · **ConcreteComponent:** `LegacyPayAdapter`, `QuickPayAdapter` · **Decorator:** `PasarelaDecorator` · **ConcreteDecorator:** `ReintentoPago`, `AuditoriaPago`, `MetricasPago` (reto) · **Ensamblador:** `ConfiguracionPagos` | **OCP:** una capa nueva es una clase nueva. **SRP:** cada decorador hace una sola cosa. **LSP:** una pasarela decorada se usa donde se espera cualquier `PasarelaDePago`. | Cuando las combinaciones son pocas y fijas (dos subclases bastan), cuando el cliente depende del tipo concreto, o cuando una capa necesita saber qué otras capas hay en la cadena. |
-| Proxy | _(Rol C)_ | | | |
+| Proxy | El catálogo es de otro equipo y tarda 1,5 s por consulta: un pedido de tres productos tarda 4,5 s solo en precios. Además, solo un ADMIN puede cambiar precios, y sin el patrón ese control se copia en cada lugar que cambia un precio. | **Subject:** `ServicioCatalogo` · **RealSubject:** `CatalogoRemoto` · **Proxy (caché):** `CatalogoCacheProxy` · **Proxy (protección):** `CatalogoProteccionProxy` · **Client:** `ProductoController`, `PedidoService` · **Composición:** `ConfiguracionCatalogo` | **OCP:** la caché y el control de acceso se agregan sin tocar `CatalogoRemoto`. **DIP:** los clientes reciben un `ServicioCatalogo` y no saben si hablan con el real o con un proxy. **SRP:** cada proxy tiene una sola responsabilidad. | Cuando el objeto real es barato y local: el proxy agrega una capa y, en el caso de la caché, el riesgo de servir datos viejos sin ganar nada. |
 
 ## 3. Patrones implementados
 
@@ -47,47 +47,103 @@ mvn test              # pruebas unitarias JUnit 5
 
 ```mermaid
 classDiagram
-    class Pedido {
-        <<Product>>
-        -final String id
-        -final String clienteId
-        -final String pais
-        -final List~ItemPedido~ items
-        -final BigDecimal subtotal
-        -final BigDecimal descuento
-        -final EstadoPedido estado
-        -final Comprobante comprobante
-        -Pedido(Builder b)
-        +conComprobante(Comprobante) Pedido
-        +pagado(String autorizacion) Pedido
-        +baseGravable() BigDecimal
-        +totalAPagar() BigDecimal
+    namespace co-edu-unbosque-shopflow-pedidos {
+        class Pedido {
+            <<Product>>
+            +String CUPON_DESCUENTO$
+            -BigDecimal PORCENTAJE_CUPON$
+            -int MAX_NOTA_REGALO$
+            -String id
+            -String clienteId
+            -String documentoCliente
+            -String pais
+            -String contacto
+            -List~ItemPedido~ items
+            -String direccionEnvio
+            -boolean recogerEnTienda
+            -String cupon
+            -String notaRegalo
+            -boolean envioExpress
+            -String canalNotificacion
+            -BigDecimal subtotal
+            -BigDecimal descuento
+            -EstadoPedido estado
+            -Comprobante comprobante
+            -String autorizacionPago
+            -Pedido(Builder b)
+            -Pedido(Pedido, EstadoPedido, Comprobante, String)
+            +conComprobante(Comprobante) Pedido
+            +pagado(String autorizacion) Pedido
+            +baseGravable() BigDecimal
+            +totalAPagar() BigDecimal
+            +id() String
+            +clienteId() String
+            +documentoCliente() String
+            +pais() String
+            +contacto() String
+            +items() List~ItemPedido~
+            +direccionEnvio() String
+            +recogerEnTienda() boolean
+            +cupon() String
+            +notaRegalo() String
+            +envioExpress() boolean
+            +canalNotificacion() String
+            +subtotal() BigDecimal
+            +descuento() BigDecimal
+            +estado() EstadoPedido
+            +comprobante() Comprobante
+            +autorizacionPago() String
+        }
+        class Builder {
+            <<Builder>>
+            -String clienteId
+            -String documentoCliente
+            -String pais
+            -String contacto
+            -List~ItemPedido~ items
+            -String id
+            -String direccionEnvio
+            -boolean recogerEnTienda
+            -String cupon
+            -String notaRegalo
+            -boolean envioExpress
+            -String canalNotificacion
+            +Builder(String, String, String, String)
+            +id(String) Builder
+            +item(ItemPedido) Builder
+            +direccionEnvio(String) Builder
+            +recogerEnTienda(boolean) Builder
+            +cupon(String) Builder
+            +notaRegalo(String) Builder
+            +envioExpress(boolean) Builder
+            +canalNotificacion(String) Builder
+            +build() Pedido
+            -requerido(String valor, String mensaje)$ void
+            -limpiar(String valor)$ String
+            -mayusculas(String valor)$ String
+        }
+        class ItemPedido {
+            <<record>>
+            +String sku
+            +String nombre
+            +int cantidad
+            +BigDecimal precioUnitario
+            +subtotal() BigDecimal
+        }
+        class PedidoService {
+            <<Director / Client>>
+            -ServicioCatalogo catalogo
+            -ServicioFacturacion facturacion
+            -PasarelasDePago pasarelas
+            -Map~String, Notificador~ notificadores
+            -Map~String, Pedido~ pedidos
+            +crear(PedidoRequest) Pedido
+            +pagar(String id, String proveedor) Pedido
+            +buscar(String id) Pedido
+            -itemsDelCatalogo(List~ItemRequest~) List~ItemPedido~
+        }
     }
-    class Builder {
-        <<Builder>>
-        +Builder(clienteId, documentoCliente, pais, contacto)
-        +id(String) Builder
-        +item(ItemPedido) Builder
-        +direccionEnvio(String) Builder
-        +recogerEnTienda(boolean) Builder
-        +cupon(String) Builder
-        +notaRegalo(String) Builder
-        +envioExpress(boolean) Builder
-        +canalNotificacion(String) Builder
-        +build() Pedido
-    }
-    class ItemPedido {
-        <<record>>
-        sku
-        nombre
-        cantidad
-        precioUnitario
-    }
-    class PedidoService {
-        <<Director / Client>>
-        +crear(PedidoRequest) Pedido
-    }
-    Pedido +-- Builder : clase estática anidada
+    Pedido -- Builder : clase estática anidada
     Builder ..> Pedido : build()
     Pedido o-- ItemPedido
     PedidoService ..> Builder : traduce el JSON a llamadas
@@ -107,41 +163,109 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class FabricaFacturacion {
-        <<interface · AbstractFactory>>
-        +pais() String
-        +crearCalculadora() CalculadoraImpuestos
-        +crearValidador() ValidadorIdentificacion
-        +crearGenerador() GeneradorComprobante
+    namespace co-edu-unbosque-shopflow-facturacion {
+        class FabricaFacturacion {
+            <<interface · AbstractFactory>>
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class CalculadoraImpuestos {
+            <<interface · AbstractProduct>>
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorIdentificacion {
+            <<interface · AbstractProduct>>
+            +validar(String documento) void
+        }
+        class GeneradorComprobante {
+            <<interface · AbstractProduct>>
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
+        class ServicioFacturacion {
+            <<Client>>
+            -Map~String, FabricaFacturacion~ fabricas
+            +ServicioFacturacion(List~FabricaFacturacion~)
+            +facturar(Pedido) Comprobante
+            -fabricaDe(String pais) FabricaFacturacion
+        }
     }
-    class FabricaColombia {
-        <<ConcreteFactory>>
+    namespace co-edu-unbosque-shopflow-facturacion-colombia {
+        class FabricaColombia {
+            <<ConcreteFactory>>
+            -AtomicInteger consecutivo
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class IvaColombia {
+            <<ConcreteProduct>>
+            -BigDecimal TARIFA$
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorCedulaNit {
+            <<ConcreteProduct>>
+            +validar(String documento) void
+        }
+        class GeneradorFacturaDian {
+            <<ConcreteProduct>>
+            -AtomicInteger consecutivo
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
     }
-    class FabricaMexico {
-        <<ConcreteFactory>>
+    namespace co-edu-unbosque-shopflow-facturacion-mexico {
+        class FabricaMexico {
+            <<ConcreteFactory>>
+            -AtomicInteger consecutivo
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class IvaMexico {
+            <<ConcreteProduct>>
+            -BigDecimal TARIFA$
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorRfc {
+            <<ConcreteProduct>>
+            +validar(String documento) void
+        }
+        class GeneradorCfdi {
+            <<ConcreteProduct>>
+            -AtomicInteger consecutivo
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
     }
-    class FabricaPeru {
-        <<ConcreteFactory · reto>>
-    }
-    class CalculadoraImpuestos {
-        <<interface · AbstractProduct>>
-        +nombre() String
-        +calcular(BigDecimal base) BigDecimal
-    }
-    class ValidadorIdentificacion {
-        <<interface · AbstractProduct>>
-        +validar(String documento)
-    }
-    class GeneradorComprobante {
-        <<interface · AbstractProduct>>
-        +generar(base, nombreImpuesto, impuesto) Comprobante
-    }
-
-    class ServicioFacturacion {
-        <<Client>>
-        -Map~String, FabricaFacturacion~ fabricas
-        +ServicioFacturacion(List~FabricaFacturacion~)
-        +facturar(Pedido) Comprobante
+    namespace co-edu-unbosque-shopflow-facturacion-peru {
+        class FabricaPeru {
+            <<ConcreteFactory · reto>>
+            -AtomicInteger consecutivo
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class IgvPeru {
+            <<ConcreteProduct · reto>>
+            -BigDecimal TARIFA$
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorRuc {
+            <<ConcreteProduct · reto>>
+            +validar(String documento) void
+        }
+        class GeneradorFacturaSunat {
+            <<ConcreteProduct · reto>>
+            -AtomicInteger consecutivo
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
     }
 
     FabricaFacturacion <|.. FabricaColombia
@@ -151,6 +275,16 @@ classDiagram
     ServicioFacturacion ..> CalculadoraImpuestos
     ServicioFacturacion ..> ValidadorIdentificacion
     ServicioFacturacion ..> GeneradorComprobante
+
+    CalculadoraImpuestos <|.. IvaColombia
+    CalculadoraImpuestos <|.. IvaMexico
+    CalculadoraImpuestos <|.. IgvPeru
+    ValidadorIdentificacion <|.. ValidadorCedulaNit
+    ValidadorIdentificacion <|.. ValidadorRfc
+    ValidadorIdentificacion <|.. ValidadorRuc
+    GeneradorComprobante <|.. GeneradorFacturaDian
+    GeneradorComprobante <|.. GeneradorCfdi
+    GeneradorComprobante <|.. GeneradorFacturaSunat
 
     FabricaColombia ..> IvaColombia
     FabricaColombia ..> ValidadorCedulaNit
@@ -183,31 +317,60 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class PasarelaDePago {
-        <<interface · Target>>
-        +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+    namespace co-edu-unbosque-shopflow-pagos {
+        class PasarelaDePago {
+            <<interface · Target>>
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
     }
-    class LegacyPayAdapter {
-        <<Adapter>>
-        -LegacyPayClient cliente
-        +cobrar(montoUsd, referencia) ResultadoPago
+    namespace co-edu-unbosque-shopflow-pagos-adaptadores {
+        class LegacyPayAdapter {
+            <<Adapter>>
+            -String MONEDA$
+            -LegacyPayClient cliente
+            +LegacyPayAdapter(LegacyPayClient cliente)
+            +LegacyPayAdapter(double probabilidadTimeout)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            -aCentavos(BigDecimal montoUsd)$ long
+            -interpretar(String texto)$ ResultadoPago
+        }
+        class QuickPayAdapter {
+            <<Adapter>>
+            -String MONEDA$
+            -QuickPaySdk sdk
+            +QuickPayAdapter(QuickPaySdk sdk)
+            +QuickPayAdapter()
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
     }
-    class QuickPayAdapter {
-        <<Adapter>>
-        -QuickPaySdk sdk
-        +cobrar(montoUsd, referencia) ResultadoPago
+    namespace co-edu-unbosque-shopflow-externos-legacypay {
+        class LegacyPayClient {
+            <<Adaptee · externos>>
+            -double timeoutProbability
+            -Random random
+            +LegacyPayClient(double timeoutProbability)
+            +makeCharge(long amountInCents, String currency, String reference) String
+            -sleep(long ms)$ void
+        }
     }
-    class LegacyPayClient {
-        <<Adaptee · externos>>
-        +makeCharge(long amountInCents, String currency, String reference) String
+    namespace co-edu-unbosque-shopflow-externos-quickpay {
+        class QuickPaySdk {
+            <<Adaptee · externos>>
+            +pay(QuickPayRequest request) QuickPayResult
+        }
     }
-    class QuickPaySdk {
-        <<Adaptee · externos>>
-        +pay(QuickPayRequest) QuickPayResult
-    }
-    class PedidoService {
-        <<Client>>
-        +pagar(String id, String proveedor) Pedido
+    namespace co-edu-unbosque-shopflow-pedidos {
+        class PedidoService {
+            <<Client>>
+            -ServicioCatalogo catalogo
+            -ServicioFacturacion facturacion
+            -PasarelasDePago pasarelas
+            -Map~String, Notificador~ notificadores
+            -Map~String, Pedido~ pedidos
+            +crear(PedidoRequest) Pedido
+            +pagar(String id, String proveedor) Pedido
+            +buscar(String id) Pedido
+        }
     }
     PasarelaDePago <|.. LegacyPayAdapter
     PasarelaDePago <|.. QuickPayAdapter
@@ -236,43 +399,81 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class PasarelaDePago {
-        <<interface · Component>>
-        +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+    direction LR
+    namespace co-edu-unbosque-shopflow-pagos-adaptadores {
+        class LegacyPayAdapter {
+            <<ConcreteComponent>>
+            -String MONEDA$
+            -LegacyPayClient cliente
+            +LegacyPayAdapter(LegacyPayClient cliente)
+            +LegacyPayAdapter(double probabilidadTimeout)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            -aCentavos(BigDecimal montoUsd)$ long
+            -interpretar(String texto)$ ResultadoPago
+        }
+        class QuickPayAdapter {
+            <<ConcreteComponent>>
+            -String MONEDA$
+            -QuickPaySdk sdk
+            +QuickPayAdapter(QuickPaySdk sdk)
+            +QuickPayAdapter()
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
     }
-    class LegacyPayAdapter {
-        <<ConcreteComponent>>
+    namespace co-edu-unbosque-shopflow-pagos {
+        class PasarelaDePago {
+            <<interface · Component>>
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
+        class RegistroAuditoria {
+            <<Component Spring>>
+            -List~EntradaAuditoria~ entradas
+            +registrar(EntradaAuditoria entrada) void
+            +entradas() List~EntradaAuditoria~
+        }
+        class ConfiguracionPagos {
+            <<punto de composición>>
+            -double probabilidadTimeout
+            -boolean reintentos
+            -int maxIntentos
+            -boolean auditoria
+            -boolean metricas
+            +pasarelasDePago(RegistroAuditoria registro) PasarelasDePago
+            -armar(String, PasarelaDePago, RegistroAuditoria) PasarelaDePago
+        }
     }
-    class QuickPayAdapter {
-        <<ConcreteComponent>>
-    }
-    class PasarelaDecorator {
-        <<abstract · Decorator>>
-        #PasarelaDePago envuelta
-        +cobrar(montoUsd, referencia) ResultadoPago
-    }
-    class ReintentoPago {
-        <<ConcreteDecorator>>
-        -int maxIntentos
-    }
-    class AuditoriaPago {
-        <<ConcreteDecorator>>
-        -String proveedor
-        -RegistroAuditoria registro
-    }
-    class MetricasPago {
-        <<ConcreteDecorator · reto>>
-        -int cobros
-        -int aprobados
-    }
-    class RegistroAuditoria {
-        <<Component Spring>>
-        +registrar(EntradaAuditoria)
-        +entradas() List
-    }
-    class ConfiguracionPagos {
-        <<punto de composición>>
-        +pasarelasDePago(RegistroAuditoria) PasarelasDePago
+    namespace co-edu-unbosque-shopflow-pagos-decoradores {
+        class PasarelaDecorator {
+            <<abstract · Decorator>>
+            #PasarelaDePago envuelta
+            #PasarelaDecorator(PasarelaDePago envuelta)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
+        class ReintentoPago {
+            <<ConcreteDecorator>>
+            -int maxIntentos
+            +ReintentoPago(PasarelaDePago envuelta, int maxIntentos)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
+        class AuditoriaPago {
+            <<ConcreteDecorator>>
+            -String proveedor
+            -RegistroAuditoria registro
+            +AuditoriaPago(PasarelaDePago, String, RegistroAuditoria)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            -registrar(String, BigDecimal, String, long) void
+        }
+        class MetricasPago {
+            <<ConcreteDecorator · reto>>
+            -String proveedor
+            -int cobros
+            -int aprobados
+            +MetricasPago(PasarelaDePago envuelta, String proveedor)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            +cobros() int
+            +aprobados() int
+            +tasaDeAprobacion() double
+        }
     }
     PasarelaDePago <|.. LegacyPayAdapter
     PasarelaDePago <|.. QuickPayAdapter
@@ -305,8 +506,196 @@ AuditoriaPago → MetricasPago → ReintentoPago → LegacyPayAdapter / QuickPay
 - `ConfiguracionPagos` es el único lugar que conoce los adapters y decoradores concretos. Cambiar las propiedades cambia las capas sin modificar ninguna clase.
 
 **Evidencia:** escenario 8 del Anexo B (`GET /api/pagos/auditoria`). Cada entrada trae `proveedor`, `referencia`, `montoUsd`, `resultado` y `duracionMs`. Pruebas: `ReintentoPagoTest` y `AuditoriaPagoTest`.
-### 3.5 Proxy: _(Rol C)_
-### 3.6 Factory Method: _(Rol C)_
+
+### 3.5 Proxy: `GET /api/productos/{sku}` y `PUT /api/productos/{sku}/precio`
+
+**Problema que resuelve.** Evitar los 1,5 s de `CatalogoRemoto` en cada consulta repetida y restringir el cambio de precios al rol ADMIN, sin que ningún cliente del catálogo sepa si habla con el objeto real o con un intermediario.
+
+```mermaid
+classDiagram
+    namespace co-edu-unbosque-shopflow-catalogo {
+        class ServicioCatalogo {
+            <<interface · Subject>>
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+        }
+        class CatalogoRemoto {
+            <<RealSubject · no se modifica>>
+            -Map~String, Producto~ productos
+            -int llamadas
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+            +llamadasRecibidas() int
+            -buscarSinLatencia(String sku) Producto
+            -latenciaDeRed() void
+        }
+        class CatalogoCacheProxy {
+            <<Proxy de caché>>
+            -ServicioCatalogo real
+            -Map~String, Producto~ cache
+            -boolean catalogoCompleto
+            +CatalogoCacheProxy(ServicioCatalogo real)
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+        }
+        class CatalogoProteccionProxy {
+            <<Proxy de protección>>
+            -String ROL_ADMIN$
+            -ServicioCatalogo real
+            -String rol
+            +CatalogoProteccionProxy(ServicioCatalogo real, String rol)
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+        }
+        class ConfiguracionCatalogo {
+            <<Configuration>>
+            +servicioCatalogo() ServicioCatalogo
+        }
+        class ProductoController {
+            <<Client>>
+            -ServicioCatalogo catalogo
+            +ProductoController(ServicioCatalogo catalogo)
+            +listar() List~Producto~
+            +buscar(String sku) Producto
+            +actualizarPrecio(String sku, String rol, PrecioRequest request) Producto
+        }
+    }
+    ServicioCatalogo <|.. CatalogoRemoto
+    ServicioCatalogo <|.. CatalogoCacheProxy
+    ServicioCatalogo <|.. CatalogoProteccionProxy
+    CatalogoCacheProxy --> ServicioCatalogo : real
+    CatalogoProteccionProxy --> ServicioCatalogo : real
+    ConfiguracionCatalogo ..> CatalogoCacheProxy : envuelve a CatalogoRemoto
+    ProductoController --> ServicioCatalogo
+    ProductoController ..> CatalogoProteccionProxy : por petición, con X-Rol
+```
+
+**Decisiones de diseño**
+- `ConfiguracionCatalogo` es el **único** lugar que sabe que existe el proxy de caché: registra `new CatalogoCacheProxy(new CatalogoRemoto())` como el `ServicioCatalogo` de toda la aplicación. `PedidoService` y `ProductoController` reciben la interfaz.
+- La caché usa `computeIfAbsent`: solo llama al catálogo real si el SKU no está en memoria. Si el real lanza `NoSuchElementException`, no se guarda nada y la API responde 404.
+- Al cambiar un precio, el proxy de caché delega al real y **reemplaza** la entrada de su caché, para no servir un precio viejo.
+- El proxy de protección se crea **por petición** en `ProductoController`, porque el rol (encabezado `X-Rol`) cambia en cada una. Las consultas pasan directo; `actualizarPrecio` lanza `AccesoDenegadoException` (403) si el rol no es ADMIN.
+
+**Evidencia:** `evidencias/escenario-1.txt` (primera consulta de SKU-003 ≈ 1,5 s; la segunda < 0,05 s) y `evidencias/escenario-2.txt` (403 con `X-Rol: CLIENTE`, 200 con `X-Rol: ADMIN` y precio nuevo en la consulta siguiente). `CatalogoCacheProxyTest` demuestra con un catálogo falso que cuenta llamadas que dos búsquedas llegan una sola vez al real.
+
+### 3.6 Factory Method: `GET /api/notificaciones`
+
+**Problema que resuelve.** Notificar el pago aprobado por el canal del pedido con un proceso fijo (armar el mensaje, crear la notificación y enviarla), dejando que cada canal decida **qué** notificación crea. `PedidoService` no tiene ningún `new Notificacion...` ni un `if` por canal.
+
+```mermaid
+classDiagram
+    namespace co-edu-unbosque-shopflow-notificaciones {
+        class Notificacion {
+            <<interface · Product>>
+            +enviar(String destino, String mensaje) void
+            +validarDestino(String destino) void
+        }
+        class NotificacionEmail {
+            <<ConcreteProduct>>
+            ~String CANAL$
+            -String ASUNTO$
+            -BandejaNotificaciones bandeja
+            +validarDestino(String destino) void
+            +enviar(String destino, String mensaje) void
+        }
+        class NotificacionSms {
+            <<ConcreteProduct>>
+            ~String CANAL$
+            -int MAX_CARACTERES$
+            -BandejaNotificaciones bandeja
+            +enviar(String destino, String mensaje) void
+        }
+        class NotificacionWhatsApp {
+            <<ConcreteProduct · reto>>
+            ~String CANAL$
+            -String PREFIJO$
+            -Pattern NUMERO_CON_INDICATIVO$
+            -BandejaNotificaciones bandeja
+            +validarDestino(String destino) void
+            +enviar(String destino, String mensaje) void
+        }
+        class Notificador {
+            <<abstract · Creator>>
+            +canal()* String
+            #crearNotificacion()* Notificacion
+            +validarDestino(String destino) void
+            +notificarPagoAprobado(String, String, BigDecimal) void
+        }
+        class NotificadorEmail {
+            <<ConcreteCreator · @Component>>
+            -BandejaNotificaciones bandeja
+            +NotificadorEmail(BandejaNotificaciones bandeja)
+            +canal() String
+            #crearNotificacion() Notificacion
+        }
+        class NotificadorSms {
+            <<ConcreteCreator · @Component>>
+            -BandejaNotificaciones bandeja
+            +NotificadorSms(BandejaNotificaciones bandeja)
+            +canal() String
+            #crearNotificacion() Notificacion
+        }
+        class NotificadorWhatsApp {
+            <<ConcreteCreator · reto>>
+            -BandejaNotificaciones bandeja
+            +NotificadorWhatsApp(BandejaNotificaciones bandeja)
+            +canal() String
+            #crearNotificacion() Notificacion
+        }
+        class BandejaNotificaciones {
+            <<proyecto base>>
+            -List~NotificacionEnviada~ enviadas
+            +registrar(String canal, String destino, String mensaje) void
+            +todas() List~NotificacionEnviada~
+        }
+    }
+    namespace co-edu-unbosque-shopflow-pedidos {
+        class PedidoService {
+            <<Client>>
+            -Map~String, Notificador~ notificadores
+            +PedidoService(..., List~Notificador~)
+            +pagar(String id, String proveedor) Pedido
+            -notificarPagoAprobado(Pedido pagado) void
+            -notificadorDe(String canal) Notificador
+        }
+    }
+    Notificacion <|.. NotificacionEmail
+    Notificacion <|.. NotificacionSms
+    Notificador <|-- NotificadorEmail
+    Notificador <|-- NotificadorSms
+    Notificacion <|.. NotificacionWhatsApp
+    Notificador <|-- NotificadorWhatsApp
+    Notificador ..> Notificacion : crearNotificacion()
+    NotificadorEmail ..> NotificacionEmail
+    NotificadorSms ..> NotificacionSms
+    NotificadorWhatsApp ..> NotificacionWhatsApp
+    PedidoService --> Notificador
+    NotificacionEmail ..> BandejaNotificaciones
+    NotificacionSms ..> BandejaNotificaciones
+    NotificacionWhatsApp ..> BandejaNotificaciones
+```
+
+| Canal | Producto | Regla propia |
+|---|---|---|
+| `EMAIL` | `NotificacionEmail` | El contacto debe tener «@» (si no, 400); el mensaje lleva el asunto `[Pago aprobado]`. |
+| `SMS` | `NotificacionSms` | El mensaje se recorta a 160 caracteres. |
+| `WHATSAPP` (reto C) | `NotificacionWhatsApp` | El contacto debe ser un número con indicativo, ej. `+573001234567` (si no, 400); el mensaje empieza con «✅». |
+
+**Decisiones de diseño**
+- `notificarPagoAprobado(...)` es `final`: el proceso no lo puede alterar ninguna subclase. Lo único que varía es el método fábrica `protected abstract Notificacion crearNotificacion()`.
+- Spring inyecta en `PedidoService` **todos** los `Notificador` anotados con `@Component` como `List<Notificador>`, y el servicio arma un mapa por `canal()`, igual que `ServicioFacturacion` con las fábricas de país.
+- Un canal no soportado responde 400 **al crear el pedido**, con la lista de canales disponibles. Es un `Optional.orElseThrow` sobre el mapa, no un `if` por canal. `Pedido.Builder` solo pasa el canal a mayúsculas: no lo valida contra una lista fija, así el reto de WhatsApp no toca `Pedido`.
+- El contacto se valida **al crear el pedido** con `Notificador.validarDestino(...)`, que delega en el mismo producto que luego se envía (`Notificacion.validarDestino`). Así un pedido EMAIL con un teléfono como contacto responde 400 antes de cobrar, y no después de un pago aprobado.
+- El canal es opcional (Anexo B.2): un pedido sin canal se crea igual y no se notifica.
+- Los productos concretos (`NotificacionEmail`, `NotificacionSms`) son *package-private*: fuera de `notificaciones` nadie puede nombrarlos.
+- Los notificadores reciben primitivas (`pedidoId`, `destino`, `totalPagado`) y no el `Pedido`, para que el paquete `notificaciones` no dependa de `pedidos`.
+- **Integración con el pago (Rol B):** `PedidoService.pagar()` notifica **después** de que `compute()` guarda el pedido como pagado, fuera del bloqueo y solo si el pago fue aprobado. Usa el contacto del pedido y su total pagado (`totalAPagar()`). Un pago rechazado (409) no notifica.
+
+**Evidencia:** escenario 8 del Anexo B (`GET /api/notificaciones`, una notificación por pago aprobado, en el canal del pedido). `NotificadorEmailTest.unContactoSinArrobaEsRechazado` demuestra que cada creador concreto produce su propio producto con sus reglas; `NotificadorSmsTest` y `PedidoServiceNotificacionTest` cubren el recorte del SMS, el 400 por canal no soportado, la notificación con el total pagado tras `pagar()` y que un pago rechazado no notifica.
 
 ## 4. Retos de extensión
 
@@ -326,6 +715,7 @@ src/test/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeruTest.java
 **Por qué no hubo que tocar nada:** `FabricaPeru` es un `@Component` que implementa `FabricaFacturacion`. Spring la agrega a la `List<FabricaFacturacion>` que recibe `ServicioFacturacion`, y ella aparece sola en el mapa con la clave `PE`. `Pedido.Builder` tampoco cambia, porque nunca validó contra una lista fija de países.
 
 **Evidencia:** `evidencias/reto-a-git-diff-stat.txt` _(pegar aquí la salida de `git diff --stat` del commit del reto)_.
+
 
 ### Reto B: Métricas (Decorator)
 
@@ -349,7 +739,33 @@ src/main/java/co/edu/unbosque/shopflow/pagos/ConfiguracionPagos.java            
 
 **Evidencia:** `evidencias/reto-b-consola.txt` y `evidencias/reto-b-git-diff-stat.txt`.
 
-### Reto C: WhatsApp: _(Rol C)_
+### Reto C: WhatsApp (Factory Method)
+
+**Qué se pidió.** Agregar `NotificadorWhatsApp`: exige un número con indicativo (por ejemplo, `+573001234567`) y antepone «✅» al mensaje. Un pedido con `"canalNotificacion": "WHATSAPP"` debe notificarse. **Qué se puede modificar: nada, solo archivos nuevos.**
+
+**Archivos del reto (todos nuevos):**
+```
+src/main/java/co/edu/unbosque/shopflow/notificaciones/NotificacionWhatsApp.java
+src/main/java/co/edu/unbosque/shopflow/notificaciones/NotificadorWhatsApp.java
+src/test/java/co/edu/unbosque/shopflow/notificaciones/NotificadorWhatsAppTest.java
+src/test/java/co/edu/unbosque/shopflow/pedidos/PedidoServiceWhatsAppTest.java
+evidencias/reto-c-whatsapp.txt
+```
+
+**Cómo se resolvió.**
+- `NotificacionWhatsApp` (producto concreto, *package-private*) implementa `Notificacion`. Sobrescribe `validarDestino(...)` para exigir `+` seguido de 8 a 15 dígitos (formato E.164) y `enviar(...)` registra en `BandejaNotificaciones` el mensaje con «✅ » adelante.
+- `NotificadorWhatsApp` (creador concreto, `@Component`) extiende `Notificador`: `canal()` devuelve `WHATSAPP` y `crearNotificacion()` entrega un `NotificacionWhatsApp`. El proceso `notificarPagoAprobado(...)` lo hereda sin cambios.
+
+**Por qué no hubo que tocar nada:**
+- Spring encuentra el nuevo `@Component` y lo agrega a la `List<Notificador>` que recibe `PedidoService`, que lo indexa por `canal()`. El canal `WHATSAPP` aparece solo en el mapa (y en el mensaje de error de un canal no soportado: `Canales disponibles: [WHATSAPP, SMS, EMAIL]`).
+- `Pedido.Builder` nunca validó el canal contra una lista fija, así que acepta `WHATSAPP` sin cambios.
+- La validación del número al **crear** el pedido sale gratis: `PedidoService.crear()` ya llama a `Notificador.validarDestino(...)`, que delega en el producto. Un pedido WhatsApp sin indicativo responde 400 antes de cobrar.
+
+**Evidencia:**
+- `evidencias/reto-c-git-diff-stat.txt`: el commit del reto (`97e8b1d`) tiene 5 archivos, todos con estado `A` (agregado), 182 inserciones y 0 eliminaciones.
+- `evidencias/reto-c-whatsapp.txt`: pedido con `+573001234567` → 201; pago → 200; `GET /api/notificaciones` → `"✅ ShopFlow: el pago del pedido PED-1 fue aprobado. Total pagado: 30.35 USD."`; pedido WhatsApp con `3001234567` → 400.
+- Pruebas: `NotificadorWhatsAppTest` (canal, prefijo «✅», número sin indicativo, correo o letras rechazados) y `PedidoServiceWhatsAppTest` (un pedido WHATSAPP se notifica tras el pago, sin modificar `PedidoService`).
+
 
 ## 5. Preguntas de reflexión
 

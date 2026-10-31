@@ -1,0 +1,17 @@
+# Escenario 6: pagar el pedido del escenario 3 con LegacyPay (200) y pagarlo otra vez (409)
+$ curl -s -i -X POST localhost:8080/api/pedidos/PED-1/pago -H 'Content-Type: application/json' -d '{"proveedor": "LEGACYPAY"}'
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Fri, 30 Oct 2026 13:23:49 GMT
+
+{"id":"PED-1","estado":"PAGADO","clienteId":"CLI-001","pais":"CO","contacto":"ana.perez@correo.com","items":[{"sku":"SKU-001","nombre":"Teclado mecánico","cantidad":1,"precioUnitario":85.00},{"sku":"SKU-002","nombre":"Mouse inalámbrico","cantidad":2,"precioUnitario":25.50}],"direccionEnvio":"Calle 134 # 9-51, Bogotá","recogerEnTienda":false,"envioExpress":true,"cupon":"BOSQUE10","notaRegalo":null,"canalNotificacion":"EMAIL","subtotal":136.00,"descuento":13.60,"comprobante":{"tipo":"Factura electrónica (DIAN)","numero":"FE-CO-1","base":122.40,"nombreImpuesto":"IVA 19%","impuesto":23.26,"total":145.66},"autorizacionPago":"LP4051"}
+
+$ curl -s -i -X POST localhost:8080/api/pedidos/PED-1/pago -H 'Content-Type: application/json' -d '{"proveedor": "LEGACYPAY"}'
+HTTP/1.1 409 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Fri, 30 Oct 2026 13:23:49 GMT
+
+{"error":"El pedido PED-1 ya fue pagado"}
+
