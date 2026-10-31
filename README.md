@@ -47,45 +47,101 @@ mvn test              # pruebas unitarias JUnit 5
 
 ```mermaid
 classDiagram
-    class Pedido {
-        <<Product>>
-        -final String id
-        -final String clienteId
-        -final String pais
-        -final List~ItemPedido~ items
-        -final BigDecimal subtotal
-        -final BigDecimal descuento
-        -final EstadoPedido estado
-        -final Comprobante comprobante
-        -Pedido(Builder b)
-        +conComprobante(Comprobante) Pedido
-        +pagado(String autorizacion) Pedido
-        +baseGravable() BigDecimal
-        +totalAPagar() BigDecimal
-    }
-    class Builder {
-        <<Builder>>
-        +Builder(clienteId, documentoCliente, pais, contacto)
-        +id(String) Builder
-        +item(ItemPedido) Builder
-        +direccionEnvio(String) Builder
-        +recogerEnTienda(boolean) Builder
-        +cupon(String) Builder
-        +notaRegalo(String) Builder
-        +envioExpress(boolean) Builder
-        +canalNotificacion(String) Builder
-        +build() Pedido
-    }
-    class ItemPedido {
-        <<record>>
-        sku
-        nombre
-        cantidad
-        precioUnitario
-    }
-    class PedidoService {
-        <<Director / Client>>
-        +crear(PedidoRequest) Pedido
+    namespace co-edu-unbosque-shopflow-pedidos {
+        class Pedido {
+            <<Product>>
+            +String CUPON_DESCUENTO$
+            -BigDecimal PORCENTAJE_CUPON$
+            -int MAX_NOTA_REGALO$
+            -String id
+            -String clienteId
+            -String documentoCliente
+            -String pais
+            -String contacto
+            -List~ItemPedido~ items
+            -String direccionEnvio
+            -boolean recogerEnTienda
+            -String cupon
+            -String notaRegalo
+            -boolean envioExpress
+            -String canalNotificacion
+            -BigDecimal subtotal
+            -BigDecimal descuento
+            -EstadoPedido estado
+            -Comprobante comprobante
+            -String autorizacionPago
+            -Pedido(Builder b)
+            -Pedido(Pedido, EstadoPedido, Comprobante, String)
+            +conComprobante(Comprobante) Pedido
+            +pagado(String autorizacion) Pedido
+            +baseGravable() BigDecimal
+            +totalAPagar() BigDecimal
+            +id() String
+            +clienteId() String
+            +documentoCliente() String
+            +pais() String
+            +contacto() String
+            +items() List~ItemPedido~
+            +direccionEnvio() String
+            +recogerEnTienda() boolean
+            +cupon() String
+            +notaRegalo() String
+            +envioExpress() boolean
+            +canalNotificacion() String
+            +subtotal() BigDecimal
+            +descuento() BigDecimal
+            +estado() EstadoPedido
+            +comprobante() Comprobante
+            +autorizacionPago() String
+        }
+        class Builder {
+            <<Builder>>
+            -String clienteId
+            -String documentoCliente
+            -String pais
+            -String contacto
+            -List~ItemPedido~ items
+            -String id
+            -String direccionEnvio
+            -boolean recogerEnTienda
+            -String cupon
+            -String notaRegalo
+            -boolean envioExpress
+            -String canalNotificacion
+            +Builder(String, String, String, String)
+            +id(String) Builder
+            +item(ItemPedido) Builder
+            +direccionEnvio(String) Builder
+            +recogerEnTienda(boolean) Builder
+            +cupon(String) Builder
+            +notaRegalo(String) Builder
+            +envioExpress(boolean) Builder
+            +canalNotificacion(String) Builder
+            +build() Pedido
+            -requerido(String valor, String mensaje)$ void
+            -limpiar(String valor)$ String
+            -mayusculas(String valor)$ String
+        }
+        class ItemPedido {
+            <<record>>
+            +String sku
+            +String nombre
+            +int cantidad
+            +BigDecimal precioUnitario
+            +subtotal() BigDecimal
+        }
+        class PedidoService {
+            <<Director / Client>>
+            -ServicioCatalogo catalogo
+            -ServicioFacturacion facturacion
+            -PasarelasDePago pasarelas
+            -Map~String, Notificador~ notificadores
+            -Map~String, Pedido~ pedidos
+            +crear(PedidoRequest) Pedido
+            +pagar(String id, String proveedor) Pedido
+            +buscar(String id) Pedido
+            -itemsDelCatalogo(List~ItemRequest~) List~ItemPedido~
+        }
     }
     Pedido -- Builder : clase estática anidada
     Builder ..> Pedido : build()
@@ -107,41 +163,109 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class FabricaFacturacion {
-        <<interface · AbstractFactory>>
-        +pais() String
-        +crearCalculadora() CalculadoraImpuestos
-        +crearValidador() ValidadorIdentificacion
-        +crearGenerador() GeneradorComprobante
+    namespace co-edu-unbosque-shopflow-facturacion {
+        class FabricaFacturacion {
+            <<interface · AbstractFactory>>
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class CalculadoraImpuestos {
+            <<interface · AbstractProduct>>
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorIdentificacion {
+            <<interface · AbstractProduct>>
+            +validar(String documento) void
+        }
+        class GeneradorComprobante {
+            <<interface · AbstractProduct>>
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
+        class ServicioFacturacion {
+            <<Client>>
+            -Map~String, FabricaFacturacion~ fabricas
+            +ServicioFacturacion(List~FabricaFacturacion~)
+            +facturar(Pedido) Comprobante
+            -fabricaDe(String pais) FabricaFacturacion
+        }
     }
-    class FabricaColombia {
-        <<ConcreteFactory>>
+    namespace co-edu-unbosque-shopflow-facturacion-colombia {
+        class FabricaColombia {
+            <<ConcreteFactory>>
+            -AtomicInteger consecutivo
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class IvaColombia {
+            <<ConcreteProduct>>
+            -BigDecimal TARIFA$
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorCedulaNit {
+            <<ConcreteProduct>>
+            +validar(String documento) void
+        }
+        class GeneradorFacturaDian {
+            <<ConcreteProduct>>
+            -AtomicInteger consecutivo
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
     }
-    class FabricaMexico {
-        <<ConcreteFactory>>
+    namespace co-edu-unbosque-shopflow-facturacion-mexico {
+        class FabricaMexico {
+            <<ConcreteFactory>>
+            -AtomicInteger consecutivo
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class IvaMexico {
+            <<ConcreteProduct>>
+            -BigDecimal TARIFA$
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorRfc {
+            <<ConcreteProduct>>
+            +validar(String documento) void
+        }
+        class GeneradorCfdi {
+            <<ConcreteProduct>>
+            -AtomicInteger consecutivo
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
     }
-    class FabricaPeru {
-        <<ConcreteFactory · reto>>
-    }
-    class CalculadoraImpuestos {
-        <<interface · AbstractProduct>>
-        +nombre() String
-        +calcular(BigDecimal base) BigDecimal
-    }
-    class ValidadorIdentificacion {
-        <<interface · AbstractProduct>>
-        +validar(String documento)
-    }
-    class GeneradorComprobante {
-        <<interface · AbstractProduct>>
-        +generar(base, nombreImpuesto, impuesto) Comprobante
-    }
-
-    class ServicioFacturacion {
-        <<Client>>
-        -Map~String, FabricaFacturacion~ fabricas
-        +ServicioFacturacion(List~FabricaFacturacion~)
-        +facturar(Pedido) Comprobante
+    namespace co-edu-unbosque-shopflow-facturacion-peru {
+        class FabricaPeru {
+            <<ConcreteFactory · reto>>
+            -AtomicInteger consecutivo
+            +pais() String
+            +crearCalculadora() CalculadoraImpuestos
+            +crearValidador() ValidadorIdentificacion
+            +crearGenerador() GeneradorComprobante
+        }
+        class IgvPeru {
+            <<ConcreteProduct · reto>>
+            -BigDecimal TARIFA$
+            +nombre() String
+            +calcular(BigDecimal base) BigDecimal
+        }
+        class ValidadorRuc {
+            <<ConcreteProduct · reto>>
+            +validar(String documento) void
+        }
+        class GeneradorFacturaSunat {
+            <<ConcreteProduct · reto>>
+            -AtomicInteger consecutivo
+            +generar(BigDecimal, String, BigDecimal) Comprobante
+        }
     }
 
     FabricaFacturacion <|.. FabricaColombia
@@ -151,6 +275,16 @@ classDiagram
     ServicioFacturacion ..> CalculadoraImpuestos
     ServicioFacturacion ..> ValidadorIdentificacion
     ServicioFacturacion ..> GeneradorComprobante
+
+    CalculadoraImpuestos <|.. IvaColombia
+    CalculadoraImpuestos <|.. IvaMexico
+    CalculadoraImpuestos <|.. IgvPeru
+    ValidadorIdentificacion <|.. ValidadorCedulaNit
+    ValidadorIdentificacion <|.. ValidadorRfc
+    ValidadorIdentificacion <|.. ValidadorRuc
+    GeneradorComprobante <|.. GeneradorFacturaDian
+    GeneradorComprobante <|.. GeneradorCfdi
+    GeneradorComprobante <|.. GeneradorFacturaSunat
 
     FabricaColombia ..> IvaColombia
     FabricaColombia ..> ValidadorCedulaNit
@@ -183,31 +317,60 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class PasarelaDePago {
-        <<interface · Target>>
-        +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+    namespace co-edu-unbosque-shopflow-pagos {
+        class PasarelaDePago {
+            <<interface · Target>>
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
     }
-    class LegacyPayAdapter {
-        <<Adapter>>
-        -LegacyPayClient cliente
-        +cobrar(montoUsd, referencia) ResultadoPago
+    namespace co-edu-unbosque-shopflow-pagos-adaptadores {
+        class LegacyPayAdapter {
+            <<Adapter>>
+            -String MONEDA$
+            -LegacyPayClient cliente
+            +LegacyPayAdapter(LegacyPayClient cliente)
+            +LegacyPayAdapter(double probabilidadTimeout)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            -aCentavos(BigDecimal montoUsd)$ long
+            -interpretar(String texto)$ ResultadoPago
+        }
+        class QuickPayAdapter {
+            <<Adapter>>
+            -String MONEDA$
+            -QuickPaySdk sdk
+            +QuickPayAdapter(QuickPaySdk sdk)
+            +QuickPayAdapter()
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
     }
-    class QuickPayAdapter {
-        <<Adapter>>
-        -QuickPaySdk sdk
-        +cobrar(montoUsd, referencia) ResultadoPago
+    namespace co-edu-unbosque-shopflow-externos-legacypay {
+        class LegacyPayClient {
+            <<Adaptee · externos>>
+            -double timeoutProbability
+            -Random random
+            +LegacyPayClient(double timeoutProbability)
+            +makeCharge(long amountInCents, String currency, String reference) String
+            -sleep(long ms)$ void
+        }
     }
-    class LegacyPayClient {
-        <<Adaptee · externos>>
-        +makeCharge(long amountInCents, String currency, String reference) String
+    namespace co-edu-unbosque-shopflow-externos-quickpay {
+        class QuickPaySdk {
+            <<Adaptee · externos>>
+            +pay(QuickPayRequest request) QuickPayResult
+        }
     }
-    class QuickPaySdk {
-        <<Adaptee · externos>>
-        +pay(QuickPayRequest) QuickPayResult
-    }
-    class PedidoService {
-        <<Client>>
-        +pagar(String id, String proveedor) Pedido
+    namespace co-edu-unbosque-shopflow-pedidos {
+        class PedidoService {
+            <<Client>>
+            -ServicioCatalogo catalogo
+            -ServicioFacturacion facturacion
+            -PasarelasDePago pasarelas
+            -Map~String, Notificador~ notificadores
+            -Map~String, Pedido~ pedidos
+            +crear(PedidoRequest) Pedido
+            +pagar(String id, String proveedor) Pedido
+            +buscar(String id) Pedido
+        }
     }
     PasarelaDePago <|.. LegacyPayAdapter
     PasarelaDePago <|.. QuickPayAdapter
@@ -236,43 +399,81 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class PasarelaDePago {
-        <<interface · Component>>
-        +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+    direction LR
+    namespace co-edu-unbosque-shopflow-pagos-adaptadores {
+        class LegacyPayAdapter {
+            <<ConcreteComponent>>
+            -String MONEDA$
+            -LegacyPayClient cliente
+            +LegacyPayAdapter(LegacyPayClient cliente)
+            +LegacyPayAdapter(double probabilidadTimeout)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            -aCentavos(BigDecimal montoUsd)$ long
+            -interpretar(String texto)$ ResultadoPago
+        }
+        class QuickPayAdapter {
+            <<ConcreteComponent>>
+            -String MONEDA$
+            -QuickPaySdk sdk
+            +QuickPayAdapter(QuickPaySdk sdk)
+            +QuickPayAdapter()
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
     }
-    class LegacyPayAdapter {
-        <<ConcreteComponent>>
+    namespace co-edu-unbosque-shopflow-pagos {
+        class PasarelaDePago {
+            <<interface · Component>>
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
+        class RegistroAuditoria {
+            <<Component Spring>>
+            -List~EntradaAuditoria~ entradas
+            +registrar(EntradaAuditoria entrada) void
+            +entradas() List~EntradaAuditoria~
+        }
+        class ConfiguracionPagos {
+            <<punto de composición>>
+            -double probabilidadTimeout
+            -boolean reintentos
+            -int maxIntentos
+            -boolean auditoria
+            -boolean metricas
+            +pasarelasDePago(RegistroAuditoria registro) PasarelasDePago
+            -armar(String, PasarelaDePago, RegistroAuditoria) PasarelaDePago
+        }
     }
-    class QuickPayAdapter {
-        <<ConcreteComponent>>
-    }
-    class PasarelaDecorator {
-        <<abstract · Decorator>>
-        #PasarelaDePago envuelta
-        +cobrar(montoUsd, referencia) ResultadoPago
-    }
-    class ReintentoPago {
-        <<ConcreteDecorator>>
-        -int maxIntentos
-    }
-    class AuditoriaPago {
-        <<ConcreteDecorator>>
-        -String proveedor
-        -RegistroAuditoria registro
-    }
-    class MetricasPago {
-        <<ConcreteDecorator · reto>>
-        -int cobros
-        -int aprobados
-    }
-    class RegistroAuditoria {
-        <<Component Spring>>
-        +registrar(EntradaAuditoria)
-        +entradas() List
-    }
-    class ConfiguracionPagos {
-        <<punto de composición>>
-        +pasarelasDePago(RegistroAuditoria) PasarelasDePago
+    namespace co-edu-unbosque-shopflow-pagos-decoradores {
+        class PasarelaDecorator {
+            <<abstract · Decorator>>
+            #PasarelaDePago envuelta
+            #PasarelaDecorator(PasarelaDePago envuelta)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
+        class ReintentoPago {
+            <<ConcreteDecorator>>
+            -int maxIntentos
+            +ReintentoPago(PasarelaDePago envuelta, int maxIntentos)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+        }
+        class AuditoriaPago {
+            <<ConcreteDecorator>>
+            -String proveedor
+            -RegistroAuditoria registro
+            +AuditoriaPago(PasarelaDePago, String, RegistroAuditoria)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            -registrar(String, BigDecimal, String, long) void
+        }
+        class MetricasPago {
+            <<ConcreteDecorator · reto>>
+            -String proveedor
+            -int cobros
+            -int aprobados
+            +MetricasPago(PasarelaDePago envuelta, String proveedor)
+            +cobrar(BigDecimal montoUsd, String referencia) ResultadoPago
+            +cobros() int
+            +aprobados() int
+            +tasaDeAprobacion() double
+        }
     }
     PasarelaDePago <|.. LegacyPayAdapter
     PasarelaDePago <|.. QuickPayAdapter
@@ -312,31 +513,56 @@ AuditoriaPago → MetricasPago → ReintentoPago → LegacyPayAdapter / QuickPay
 
 ```mermaid
 classDiagram
-    class ServicioCatalogo {
-        <<interface · Subject>>
-        +buscar(String sku) Producto
-        +listar() List~Producto~
-        +actualizarPrecio(String sku, BigDecimal) Producto
-    }
-    class CatalogoRemoto {
-        <<RealSubject · no se modifica>>
-    }
-    class CatalogoCacheProxy {
-        <<Proxy de caché>>
-        -ServicioCatalogo real
-        -ConcurrentHashMap~String, Producto~ cache
-    }
-    class CatalogoProteccionProxy {
-        <<Proxy de protección>>
-        -ServicioCatalogo real
-        -String rol
-    }
-    class ConfiguracionCatalogo {
-        <<Configuration>>
-        +servicioCatalogo() ServicioCatalogo
-    }
-    class ProductoController {
-        <<Client>>
+    namespace co-edu-unbosque-shopflow-catalogo {
+        class ServicioCatalogo {
+            <<interface · Subject>>
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+        }
+        class CatalogoRemoto {
+            <<RealSubject · no se modifica>>
+            -Map~String, Producto~ productos
+            -int llamadas
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+            +llamadasRecibidas() int
+            -buscarSinLatencia(String sku) Producto
+            -latenciaDeRed() void
+        }
+        class CatalogoCacheProxy {
+            <<Proxy de caché>>
+            -ServicioCatalogo real
+            -Map~String, Producto~ cache
+            -boolean catalogoCompleto
+            +CatalogoCacheProxy(ServicioCatalogo real)
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+        }
+        class CatalogoProteccionProxy {
+            <<Proxy de protección>>
+            -String ROL_ADMIN$
+            -ServicioCatalogo real
+            -String rol
+            +CatalogoProteccionProxy(ServicioCatalogo real, String rol)
+            +buscar(String sku) Producto
+            +listar() List~Producto~
+            +actualizarPrecio(String sku, BigDecimal nuevoPrecio) Producto
+        }
+        class ConfiguracionCatalogo {
+            <<Configuration>>
+            +servicioCatalogo() ServicioCatalogo
+        }
+        class ProductoController {
+            <<Client>>
+            -ServicioCatalogo catalogo
+            +ProductoController(ServicioCatalogo catalogo)
+            +listar() List~Producto~
+            +buscar(String sku) Producto
+            +actualizarPrecio(String sku, String rol, PrecioRequest request) Producto
+        }
     }
     ServicioCatalogo <|.. CatalogoRemoto
     ServicioCatalogo <|.. CatalogoCacheProxy
@@ -362,41 +588,80 @@ classDiagram
 
 ```mermaid
 classDiagram
-    class Notificacion {
-        <<interface · Product>>
-        +enviar(String destino, String mensaje)
+    namespace co-edu-unbosque-shopflow-notificaciones {
+        class Notificacion {
+            <<interface · Product>>
+            +enviar(String destino, String mensaje) void
+            +validarDestino(String destino) void
+        }
+        class NotificacionEmail {
+            <<ConcreteProduct>>
+            ~String CANAL$
+            -String ASUNTO$
+            -BandejaNotificaciones bandeja
+            +validarDestino(String destino) void
+            +enviar(String destino, String mensaje) void
+        }
+        class NotificacionSms {
+            <<ConcreteProduct>>
+            ~String CANAL$
+            -int MAX_CARACTERES$
+            -BandejaNotificaciones bandeja
+            +enviar(String destino, String mensaje) void
+        }
+        class NotificacionWhatsApp {
+            <<ConcreteProduct · reto>>
+            ~String CANAL$
+            -String PREFIJO$
+            -Pattern NUMERO_CON_INDICATIVO$
+            -BandejaNotificaciones bandeja
+            +validarDestino(String destino) void
+            +enviar(String destino, String mensaje) void
+        }
+        class Notificador {
+            <<abstract · Creator>>
+            +canal()* String
+            #crearNotificacion()* Notificacion
+            +validarDestino(String destino) void
+            +notificarPagoAprobado(String, String, BigDecimal) void
+        }
+        class NotificadorEmail {
+            <<ConcreteCreator · @Component>>
+            -BandejaNotificaciones bandeja
+            +NotificadorEmail(BandejaNotificaciones bandeja)
+            +canal() String
+            #crearNotificacion() Notificacion
+        }
+        class NotificadorSms {
+            <<ConcreteCreator · @Component>>
+            -BandejaNotificaciones bandeja
+            +NotificadorSms(BandejaNotificaciones bandeja)
+            +canal() String
+            #crearNotificacion() Notificacion
+        }
+        class NotificadorWhatsApp {
+            <<ConcreteCreator · reto>>
+            -BandejaNotificaciones bandeja
+            +NotificadorWhatsApp(BandejaNotificaciones bandeja)
+            +canal() String
+            #crearNotificacion() Notificacion
+        }
+        class BandejaNotificaciones {
+            <<proyecto base>>
+            -List~NotificacionEnviada~ enviadas
+            +registrar(String canal, String destino, String mensaje) void
+            +todas() List~NotificacionEnviada~
+        }
     }
-    class NotificacionEmail {
-        <<ConcreteProduct>>
-    }
-    class NotificacionSms {
-        <<ConcreteProduct>>
-    }
-    class NotificacionWhatsApp {
-        <<ConcreteProduct · reto>>
-    }
-    class Notificador {
-        <<abstract · Creator>>
-        +canal() String
-        +notificarPagoAprobado(pedidoId, destino, totalPagado) void
-        #crearNotificacion() Notificacion
-    }
-    class NotificadorEmail {
-        <<ConcreteCreator · @Component>>
-    }
-    class NotificadorSms {
-        <<ConcreteCreator · @Component>>
-    }
-    class NotificadorWhatsApp {
-        <<ConcreteCreator · reto>>
-    }
-    class PedidoService {
-        <<Client>>
-        -Map~String, Notificador~ notificadores
-        +PedidoService(..., List~Notificador~)
-    }
-    class BandejaNotificaciones {
-        <<proyecto base>>
+    namespace co-edu-unbosque-shopflow-pedidos {
+        class PedidoService {
+            <<Client>>
+            -Map~String, Notificador~ notificadores
+            +PedidoService(..., List~Notificador~)
+            +pagar(String id, String proveedor) Pedido
+            -notificarPagoAprobado(Pedido pagado) void
+            -notificadorDe(String canal) Notificador
+        }
     }
     Notificacion <|.. NotificacionEmail
     Notificacion <|.. NotificacionSms
