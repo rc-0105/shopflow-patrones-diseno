@@ -723,9 +723,9 @@ src/test/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeruTest.java
 
 **Archivos del reto:**
 ```
-src/main/java/co/edu/unbosque/shopflow/pagos/decoradores/MetricasPago.java          (nuevo)
-src/test/java/co/edu/unbosque/shopflow/pagos/decoradores/MetricasPagoTest.java      (nuevo)
-src/main/java/co/edu/unbosque/shopflow/pagos/ConfiguracionPagos.java                (única modificación permitida: +8 líneas)
+src/main/java/co/edu/unbosque/shopflow/pagos/decoradores/MetricasPago.java         
+src/test/java/co/edu/unbosque/shopflow/pagos/decoradores/MetricasPagoTest.java     
+src/main/java/co/edu/unbosque/shopflow/pagos/ConfiguracionPagos.java                
 ```
 
 **Cómo se resolvió.**
