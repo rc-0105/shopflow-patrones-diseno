@@ -716,7 +716,29 @@ src/test/java/co/edu/unbosque/shopflow/facturacion/peru/FabricaPeruTest.java
 
 **Evidencia:** `evidencias/reto-a-git-diff-stat.txt` _(pegar aquí la salida de `git diff --stat` del commit del reto)_.
 
-### Reto B: Métricas: _(Rol B)_
+
+### Reto B: Métricas (Decorator)
+
+**Qué se pidió.** Agregar el decorador `MetricasPago`, que cuenta los cobros y los aprobados de cada pasarela y escribe en consola la tasa de aprobación después de cada cobro. Solo se puede modificar `ConfiguracionPagos`, para agregar la capa.
+
+**Archivos del reto:**
+```
+src/main/java/co/edu/unbosque/shopflow/pagos/decoradores/MetricasPago.java          (nuevo)
+src/test/java/co/edu/unbosque/shopflow/pagos/decoradores/MetricasPagoTest.java      (nuevo)
+src/main/java/co/edu/unbosque/shopflow/pagos/ConfiguracionPagos.java                (única modificación permitida: +8 líneas)
+```
+
+**Cómo se resolvió.**
+- `MetricasPago` (decorador concreto) extiende `PasarelaDecorator`. Su `cobrar(...)` delega en la pasarela envuelta y, en un bloque `finally`, suma el cobro, suma el aprobado si el resultado fue aprobado y escribe en consola `Métricas <PROVEEDOR>: aprobados/cobros aprobados (tasa %)`.
+- Expone `cobros()`, `aprobados()` y `tasaDeAprobacion()` (de 0 a 100; 0 si todavía no hay cobros). Los métodos son `synchronized` para que dos pagos al mismo tiempo no pierdan un conteo.
+- La cadena queda `AuditoriaPago → MetricasPago → ReintentoPago → adapter`. Como las métricas van por fuera del reintento, un cobro que necesitó 3 intentos cuenta como **un** cobro, que es lo que ve el cliente.
+
+**Por qué casi no hubo que tocar nada:**
+- `MetricasPago` extiende `PasarelaDecorator`, así que ya es una `PasarelaDePago` y encaja en la cadena sin cambiar las otras capas.
+- Un cobro que termina en excepción (por ejemplo, el 503 de LegacyPay) cuenta como cobro no aprobado, y la excepción se sigue propagando igual.
+
+**Evidencia:** `evidencias/reto-b-consola.txt` y `evidencias/reto-b-git-diff-stat.txt`.
+
 ### Reto C: WhatsApp (Factory Method)
 
 **Qué se pidió.** Agregar `NotificadorWhatsApp`: exige un número con indicativo (por ejemplo, `+573001234567`) y antepone «✅» al mensaje. Un pedido con `"canalNotificacion": "WHATSAPP"` debe notificarse. **Qué se puede modificar: nada, solo archivos nuevos.**
@@ -743,6 +765,7 @@ evidencias/reto-c-whatsapp.txt
 - `evidencias/reto-c-git-diff-stat.txt`: el commit del reto (`97e8b1d`) tiene 5 archivos, todos con estado `A` (agregado), 182 inserciones y 0 eliminaciones.
 - `evidencias/reto-c-whatsapp.txt`: pedido con `+573001234567` → 201; pago → 200; `GET /api/notificaciones` → `"✅ ShopFlow: el pago del pedido PED-1 fue aprobado. Total pagado: 30.35 USD."`; pedido WhatsApp con `3001234567` → 400.
 - Pruebas: `NotificadorWhatsAppTest` (canal, prefijo «✅», número sin indicativo, correo o letras rechazados) y `PedidoServiceWhatsAppTest` (un pedido WHATSAPP se notifica tras el pago, sin modificar `PedidoService`).
+
 
 ## 5. Preguntas de reflexión
 
