@@ -769,7 +769,190 @@ evidencias/reto-c-whatsapp.txt
 
 ## 5. Preguntas de reflexión
 
-_(pendiente: responder en grupo)_
+ ### 1. `PedidoService` sin Factory Method ni Abstract Factory
+
+  Toda la creación quedaría dentro de `PedidoService`, decidida con condicionales:
+
+  ```java
+  // Facturación: un if por país en CADA pieza de la familia
+  BigDecimal impuesto;
+  if (pais.equals("CO"))      impuesto = subtotal.multiply(new BigDecimal("0.19"));
+  else if (pais.equals("MX")) impuesto = subtotal.multiply(new BigDecimal("0.16"));
+  else throw new IllegalArgumentException("País no soportado");
+
+  if (pais.equals("CO"))      validarCedulaNit(documento);
+  else if (pais.equals("MX")) validarRfc(documento);
+
+  Comprobante comprobante;
+  if (pais.equals("CO"))      comprobante = new FacturaDian(...);
+  else if (pais.equals("MX")) comprobante = new Cfdi(...);
+
+  // Notificaciones: un if por canal, al validar el contacto y otro al notificar
+  if (canal.equals("EMAIL"))     { validarCorreo(contacto); new NotificacionEmail().enviar(...); }
+  else if (canal.equals("SMS"))  { validarCelular(contacto); new NotificacionSms().enviar(...); }
+  ```
+
+  - **Cuántos `if`:** 6 para facturación (3 piezas × 2 países) y al menos 4 para notificaciones (2 canales × validar y
+  enviar). Son 10 condicionales en una sola clase, y el número crece con cada combinación nueva.
+  - **Abrir Perú:** hay que agregar una rama en cada uno de los 3 `if` de país. Si se olvida una, el pedido queda con el
+  IGV de Perú y el comprobante de otro país, y eso no falla al compilar.
+  - **Agregar WhatsApp:** hay que agregar ramas en los `if` de canal, tanto en la validación como en el envío.
+  - **Clases que se modifican:** `PedidoService` en los dos casos, y cualquier otra clase que repita el mismo `if`. Hoy
+  las dos extensiones se hicieron **solo con archivos nuevos** (ver `evidencias/reto-a-git-diff-stat.txt` y
+  `evidencias/reto-c-git-diff-stat.txt`): `PedidoService` recibe `List<Notificador>` y `ServicioFacturacion` recibe
+  `List<FabricaFacturacion>`, y las dos clases las indexan en un mapa.
+
+  ### 2. ¿Por qué Factory Method en notificaciones y Abstract Factory en facturación?
+
+  Por **cuántos productos** hay que crear de una vez:
+
+  - **Notificaciones: un solo producto.** Cada canal necesita un único objeto, la `Notificacion`. Basta un método
+  fábrica (`Notificador.crearNotificacion()`) que cada subclase sobrescribe. El algoritmo común
+  (`notificarPagoAprobado`, `final`) vive en la superclase y solo delega el *qué crear*. Es herencia: un creador
+  concreto por canal.
+  - **Facturación: una familia de productos.** Cada país necesita **tres** objetos que deben ser coherentes entre sí:
+  impuesto, validador de documento y comprobante. `FabricaFacturacion` agrupa los tres métodos de creación, y elegir la
+  fábrica (`FabricaColombia`) asegura que las tres piezas sean del mismo país. Es composición: el cliente
+  (`ServicioFacturacion`) recibe una fábrica y nunca mezcla productos de dos fábricas.
+
+  Si las notificaciones usaran Abstract Factory, sería una fábrica con un solo método: ceremonia sin beneficio. Si la
+  facturación usara tres Factory Method separados, nada impediría combinar `IvaColombia` con `GeneradorCfdi`.
+
+  ### 3. Invertir el orden de los decoradores
+
+  El orden actual (`ConfiguracionPagos.armar`) es `AuditoriaPago(MetricasPago(ReintentoPago(adapter)))`: la auditoría va
+  **por fuera** del reintento. Se armaron las dos cadenas con `LegacyPayAdapter(0.3)`, `ReintentoPago(…, 3)` y
+  `AuditoriaPago`, y se pagaron cinco pedidos con cada una:
+
+  ```
+  AUDITORIA AFUERA (actual) -> 5 entradas, 5 cobros aprobados
+     PED-1 | APROBADO | 628 ms      <- hubo un timeout y un reintento, pero queda una sola entrada
+     PED-2 | APROBADO | 311 ms
+     PED-3 | APROBADO | 619 ms
+     PED-4 | APROBADO | 312 ms
+     PED-5 | APROBADO | 627 ms
+  REINTENTO AFUERA (invertido) -> 7 entradas, 5 cobros aprobados
+     PED-1 | ERROR: LegacyPay no responde, intente más tarde | 304 ms
+     PED-1 | APROBADO | 310 ms
+     PED-2 | APROBADO | 309 ms
+     PED-3 | APROBADO | 311 ms
+     PED-4 | APROBADO | 310 ms
+     PED-5 | ERROR: LegacyPay no responde, intente más tarde | 311 ms
+     PED-5 | APROBADO | 315 ms
+  ```
+
+  **Qué cambia en `GET /api/pagos/auditoria`:**
+  - **Orden invertido:** la auditoría envuelve cada **intento**, así que aparece una entrada por intento. Un pedido que
+  tuvo timeouts deja varias filas (`ERROR` y después `APROBADO`). La cantidad de filas ya no coincide con la cantidad de
+  cobros (7 filas para 5 pagos), y la duración de cada fila es la de un intento, no la del cobro completo.
+  - **Orden actual:** una entrada por **cobro**, con el resultado final y la duración total que vio el cliente,
+  reintentos incluidos. Los ~620 ms de PED-1 y PED-3 delatan un reintento.
+
+  Como el timeout es aleatorio (30 %), la cantidad exacta de filas cambia en cada corrida, pero con el orden invertido
+  siempre aparece una fila extra por cada timeout.
+
+  **Qué orden conviene:** el **actual**, con la auditoría por fuera. Auditoría necesita registrar cada cobro y su
+  resultado: una fila por cobro, sin falsos `ERROR` de pagos que al final se aprobaron. El orden invertido solo serviría
+  como diagnóstico técnico del proveedor (cuántas veces falla LegacyPay), y para eso ya existe `MetricasPago`. Que el
+  resultado cambie solo con reordenar demuestra que cada decorador es independiente y que el orden es una decisión de
+  composición que vive en un único lugar (`ConfiguracionPagos`).
+
+  ### 4. `CatalogoCacheProxy` y `AuditoriaPago`: misma estructura, distinta intención
+
+  La estructura es igual: implementan la interfaz y guardan una referencia al objeto envuelto. La diferencia está en la
+  **intención**:
+
+  | | `CatalogoCacheProxy` (Proxy) | `AuditoriaPago` (Decorator) |
+  |---|---|---|
+  | Propósito | **Controla el acceso** al objeto real: decide si hace falta llamarlo. | **Agrega una responsabilidad**
+  al cobro sin cambiar su resultado. |
+  | ¿Siempre delega? | **No.** `cache.computeIfAbsent(sku, real::buscar)` solo llama a `CatalogoRemoto` cuando el SKU no
+  está en memoria. `CatalogoProteccionProxy` puede no delegar nunca (lanza `AccesoDenegadoException`). | **Sí.**
+  `super.cobrar(...)` se ejecuta siempre; antes y después solo se mide y se registra. |
+  | Relación con el envuelto | Representa a un objeto real concreto y costoso (`CatalogoRemoto`, 1,5 s). Ni el cliente
+  ni el resto del sistema saben que existe. | Envuelve cualquier `PasarelaDePago`, incluso otro decorador. |
+  | Apilamiento | Normalmente uno por motivo (caché o protección). | Diseñado para apilarse en cualquier orden
+  (`Reintento`, `Métricas`, `Auditoría`). |
+
+  En resumen, el Proxy responde a "¿se debe o se necesita llamar al objeto real?" y el Decorator a "¿qué más se hace
+  alrededor de la llamada?".
+
+  ### 5. Precio cambiado directamente en el catálogo remoto
+
+  **Problema:** la caché no tiene expiración ni invalidación. `buscar()` usa `computeIfAbsent`: una vez guardado un SKU,
+  **nunca** vuelve a consultar `CatalogoRemoto`. Solo `CatalogoCacheProxy.actualizarPrecio()` refresca la entrada, y
+  eso pasa únicamente cuando el cambio entra por ShopFlow. Si otro sistema cambia el precio directo en el catálogo
+  remoto, ShopFlow sigue mostrando **y cobrando** el precio viejo (`PedidoService` toma el precio de
+  `catalogo.buscar(...)`) hasta que se reinicie la aplicación. `listar()` tiene el mismo problema por la bandera
+  `catalogoCompleto`.
+
+  **Solución propuesta:** combinar dos mecanismos.
+  1. **Expiración por tiempo (TTL):** guardar cada producto con la hora en que se cargó y volver a consultar el remoto
+  cuando pasen, por ejemplo, 5 minutos. Acota el tiempo máximo de inconsistencia sin depender del otro equipo. En Spring
+  se puede delegar en Caffeine (`expireAfterWrite`).
+  2. **Invalidación por evento:** si el equipo del catálogo publica un evento (webhook o mensaje) cuando cambia un
+  precio, el proxy ofrece `invalidar(sku)` para quitar la entrada en el momento.
+
+  **Compromiso:** un TTL más corto da datos más frescos, pero más llamadas de 1,5 s. Para un precio que se va a
+  **cobrar** también se puede volver a consultar el remoto solo al confirmar el pedido, y usar la caché para mostrar el
+  catálogo. Todo esto cabe dentro de `CatalogoCacheProxy`, sin tocar `CatalogoRemoto` ni a los clientes.
+
+  ### 6. `QuickPayAdapter` convierte `BigDecimal` a `double`
+
+  **Riesgo:** `double` es binario y no representa exacto la mayoría de los decimales. `new
+  BigDecimal("30.35").doubleValue()` guarda en realidad `30.3500000000000014210854715…`. Con un solo valor el proveedor
+  suele redondearlo bien, pero si QuickPay suma, aplica comisiones o compara montos con ese `double`, aparecen
+  diferencias de centavos (el clásico `0.1 + 0.2 != 0.3`) que después no cuadran en la conciliación. Además se pierde la
+  escala: `30.30` llega como `30.3`.
+
+  **Por qué conviene que viva en el adapter:**
+  - **El dominio queda limpio:** `Pedido`, `ServicioFacturacion` y `PasarelaDePago` trabajan siempre con `BigDecimal`.
+  La imprecisión aparece solo en la frontera con el sistema externo, que es justamente quien la impone.
+  - **Un solo lugar para controlar el riesgo:** si hace falta redondear antes de convertir (por ejemplo,
+  `montoUsd.setScale(2, RoundingMode.HALF_EVEN).doubleValue()`) o si QuickPay cambia a otro tipo, se modifica una línea
+  de `QuickPayAdapter.cobrar()` y ninguna clase de negocio.
+  - **Consistencia con LegacyPay:** su adapter hace su propia traducción (USD a centavos). Cada proveedor tiene sus
+  manías y cada adapter las aísla (DIP + SRP).
+
+  ### 7. ¿Dónde no convenía aplicar un patrón?
+
+  Siguiendo el criterio "cuándo no usarlo" del Anexo A:
+
+  - **`ItemPedido` sin Builder.** Tiene 4 datos, todos obligatorios y sin reglas cruzadas. Con pocos parámetros
+  obligatorios el builder duplica código sin aportar nada, y por eso es un `record`. Lo mismo pasa con `ResultadoPago`
+  (usa métodos estáticos `aprobado()`/`rechazado()`), `EntradaAuditoria` y `Comprobante`.
+  - **Sin Adapter para los tipos propios de ShopFlow.** `ServicioCatalogo`, `PasarelaDePago` y `Notificacion` son
+  interfaces que controla el equipo. Cuando se controlan las dos interfaces, lo simple es alinearlas, no adaptarlas. El
+  Adapter se reservó para los SDK que **no** se pueden modificar (`externos`).
+  - **Sin Proxy de caché para objetos baratos y locales.** `BandejaNotificaciones`, `RegistroAuditoria` y
+  `ServicioFacturacion` responden en memoria al instante. Un proxy solo agregaría una capa y el riesgo de datos viejos.
+  Solo `CatalogoRemoto` (1,5 s por llamada) justificaba la caché.
+  - **Sin Decorator para elegir la pasarela.** `PasarelasDePago` es un mapa `proveedor → pasarela`. No hay
+  comportamiento que agregar, solo una búsqueda, así que una jerarquía de decoradores o fábricas no aportaría nada.
+  - **Sin Abstract Factory en notificaciones** (ver pregunta 2): no hay familia, hay un solo producto por canal.
+
+  ### 8. Principio SOLID por patrón, con la evidencia
+
+  | Patrón | Principio | Evidencia en el código |
+  |---|---|---|
+  | **Builder** | **SRP** | `Pedido` solo representa el pedido (constructor privado, sin setters), y `Pedido.Builder` se
+  encarga de construirlo y validarlo: `build()` lanza `IllegalArgumentException("El pedido debe tener al menos un
+  ítem")`. |
+  | **Abstract Factory** | **OCP + DIP** | `ServicioFacturacion` depende solo de `FabricaFacturacion` y la recibe como
+  `List<FabricaFacturacion>` indexada por `pais()`. Perú entró como clase nueva (`FabricaPeru`) sin modificar nada. |
+  | **Factory Method** | **OCP + DIP** | `PedidoService` declara `Map<String, Notificador> notificadores` y nunca hace
+  `new` de un canal. `Notificador` define `protected abstract Notificacion crearNotificacion()`. WhatsApp fue solo una
+  subclase nueva (`NotificadorWhatsApp`). |
+  | **Adapter** | **DIP + SRP** | `PedidoService.pagar()` usa `PasarelaDePago pasarela = pasarelas.obtener(proveedor)`,
+  una abstracción propia. La traducción a centavos y la captura de `LegacyPayTimeoutException` viven solo en
+  `LegacyPayAdapter`. |
+  | **Decorator** | **OCP + LSP + SRP** | `PasarelaDecorator implements PasarelaDePago` y delega en
+  `envuelta.cobrar(...)`, así que una pasarela decorada sirve donde se espere cualquier `PasarelaDePago` (LSP). Cada
+  decorador hace una sola cosa, y `MetricasPago` (reto B) se agregó con una línea en `ConfiguracionPagos.armar()` sin
+  tocar los demás (OCP). |
+  | **Proxy** | **OCP + DIP** | `ConfiguracionCatalogo` devuelve `new CatalogoCacheProxy(new CatalogoRemoto())` como
+  `ServicioCatalogo`: los clientes no saben si hablan con el real. La caché y el control de rol de
+  `CatalogoProteccionProxy` (solo `ADMIN` cambia precios) se agregaron sin modificar `CatalogoRemoto`. |
 
 ## 6. Conclusiones y dificultades
 
