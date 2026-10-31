@@ -773,4 +773,24 @@ _(pendiente: responder en grupo)_
 
 ## 6. Conclusiones y dificultades
 
-_(pendiente: responder en grupo)_
+### Conclusiones
+
+Programar contra interfaces, utilizar interfaces como PasarelaDePago, ServicioCatalogo, Notificador y FabricaFacturacion facilitó los cambios en el sistema. PedidoService no depende de clases concretas, por lo que fue posible cambiar el proveedor de pago, el país o el canal de notificación sin modificar su código.
+
+Familias consistentes con Abstract Factory, cada país entrega juntas sus tres piezas: impuesto, validación del documento y comprobante. Esto evitó mezclar, por ejemplo, el IVA de Colombia con el CFDI de México.
+
+Diferencias entre Adapter, Decorator y Proxy, aunque los tres patrones tienen una estructura similar, cada uno cumple una función diferente. Adapter permite adaptar una interfaz, Decorator agrega comportamiento y Proxy controla el acceso a un objeto.
+
+Mejor rendimiento y seguridad con Proxy, el proxy de caché redujo la consulta repetida de un producto de 1,5 segundos a unos pocos milisegundos, y el proxy de protección dejó el control de acceso por rol en una sola clase.
+
+Orden de los decoradores, el orden en que se combinan afecta el resultado. Al colocar la auditoría por fuera del reintento, se registra una sola entrada por cobro. De igual manera, al ubicar las métricas por fuera del reintento, se contabiliza el cobro como una sola operación, aunque se realicen varios intentos.
+
+### Dificultades
+
+Reglas cruzadas del pedido, algunas validaciones dependen de varias opciones a la vez, como la dirección obligatoria si no se recoge en tienda o que un pedido para recoger en tienda no puede ser express. Además, varios campos del JSON son opcionales y pueden llegar vacíos. Para no repartir estas reglas por el código, se concentraron todas en el método build() del Builder.
+
+Cálculos con dinero, los impuestos y descuentos debían dar exactamente los valores esperados en cada país. Para evitar errores de precisión se trabajó con BigDecimal y con un redondeo definido, y cada fábrica se encargó de su propia tarifa y formato de documento.
+
+Caché sin datos viejos, el proxy de caché no podía seguir mostrando un precio anterior después de que un administrador lo cambiara. Por eso, al actualizar un precio, el proxy también actualiza su caché.
+
+Integración de ramas, al integrar los cambios desarrollados por cada integrante, surgieron conflictos principalmente en PedidoService y en el archivo README. Fue necesario revisar las diferencias y combinar manualmente los cambios para mantener el funcionamiento del proyecto.
